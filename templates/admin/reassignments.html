@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Reassignments History{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>All Lead Reassignments</h2>
+    <hr>
+    <div class="card">
+        <div class="card-body table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>From Agent</th>
+                        <th>To Agent</th>
+                        <th>Date/Time</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reassignments %}
+                    <tr>
+                        <td>{{ r.lead.name }}</td>
+                        <td>{{ r.from_agent.username if r.from_agent else 'N/A' }}</td>
+                        <td>{{ r.to_agent.username if r.to_agent else 'N/A' }}</td>
+                        <td>{{ r.reassigned_at }}</td>
+                        <td>{{ r.notes or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5">No reassignments yet</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

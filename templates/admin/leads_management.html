@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>Leads Management</h2>
+
+        <!-- Filter Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Filter Leads</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('admin.leads_management') }}" class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" name="name" class="form-control" placeholder="Name"
+                               value="{{ request.args.get('name', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" name="mobile" class="form-control" placeholder="Mobile"
+                               value="{{ request.args.get('mobile', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" name="project_name" class="form-control" placeholder="Project Name"
+                               value="{{ request.args.get('project_name', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" name="pincode" class="form-control" placeholder="Pincode"
+                               value="{{ request.args.get('pincode', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="status" class="form-select">
+                            <option value="">All Statuses</option>
+                            <option value="new" {% if request.args.get('status')=='new' %}selected{% endif %}>New</option>
+                            <option value="assigned" {% if request.args.get('status')=='assigned' %}selected{% endif %}>Assigned</option>
+                            <option value="completed" {% if request.args.get('status')=='completed' %}selected{% endif %}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                        <a href="{{ url_for('admin.leads_management') }}" class="btn btn-secondary">Reset</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Bulk Assignment -->
+        <form method="POST" action="{{ url_for('admin.bulk_assign') }}">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>All Leads</h5>
+                    <div class="d-flex align-items-center">
+                        <select name="agent_id" class="form-select me-2" style="width:200px" required>
+                            <option value="">Select Agent</option>
+                            {% for agent in agents %}
+                            <option value="{{ agent.id }}">{{ agent.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-success">Assign Selected</button>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="select-all"></th>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Mobile</th>
+                                    <th>Email</th>
+                                    <th>Project</th>
+                                    <th>Location</th>
+                                    <th>Pincode</th>
+                                    <th>Status</th>
+                                    <th>Assigned Agent</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lead in leads %}
+                                <tr>
+                                    <td><input type="checkbox" name="lead_ids" value="{{ lead.id }}"></td>
+                                    <td>{{ lead.id }}</td>
+                                    <td>{{ lead.name }}</td>
+                                    <td>{{ lead.mobile }}</td>
+                                    <td>{{ lead.email or 'N/A' }}</td>
+                                    <td>{{ lead.project_name }}</td>
+                                    <td>{{ lead.location }}</td>
+                                    <td>{{ lead.pincode or 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if lead.status == 'completed' else 'warning' if lead.status == 'assigned' else 'secondary' }}">
+                                            {{ lead.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ lead.assigned_agent.username if lead.assigned_agent else 'Not Assigned' }}</td>
+                                    <td>
+                                        <a href="{{ url_for('admin.lead_details', lead_id=lead.id) }}" class="btn btn-info btn-sm">
+                                            View Details
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Select all checkboxes
+    document.getElementById('select-all')?.addEventListener('click', function () {
+        const checkboxes = document.querySelectorAll('input[name="lead_ids"]');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+</script>
+{% endblock %}

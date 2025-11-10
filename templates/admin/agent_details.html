@@ -1,0 +1,77 @@
+<h2>Agent: {{ agent.username }}</h2>
+<p>Email: {{ agent.email }}</p>
+<p>Status: {{ 'Active' if agent.is_active else 'Inactive' }}</p>
+
+<h3>Assigned Leads</h3>
+<table>
+    <tr>
+        <th>Lead Name</th>
+        <th>Mobile</th>
+        <th>Project</th>
+        <th>Status</th>
+        <th>Assigned Date</th>
+    </tr>
+    {% for lead in assigned_leads %}
+    <tr>
+        <td>{{ lead.name }}</td>
+        <td>{{ lead.mobile }}</td>
+        <td>{{ lead.project_name }}</td>
+        <td>{{ lead.status }}</td>
+        <td>{{ lead.assigned_date }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<h3>Feedback Given</h3>
+<table>
+    <tr>
+        <th>Lead Name</th>
+        <th>Interest Level</th>
+        <th>Notes</th>
+        <th>Call Date</th>
+    </tr>
+    {% for fb in feedbacks %}
+    <tr>
+        <td>{{ fb.lead.name }}</td>
+        <td>{{ fb.interest_level.value if fb.interest_level else 'N/A' }}</td>
+        <td>{{ fb.additional_notes }}</td>
+        <td>{{ fb.call_date }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<h3>Lead Reassignments (From Agent)</h3>
+<table>
+    <tr>
+        <th>Lead Name</th>
+        <th>To Agent</th>
+        <th>Reason</th>
+        <th>Date</th>
+    </tr>
+    {% for r in reassignments_from %}
+    <tr>
+        <td>{{ r.lead.name }}</td>
+        <td>{{ r.to_agent.username }}</td>
+        <td>{{ r.reason }}</td>
+        <td>{{ r.reassigned_at }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<h3>Lead Reassignments (To Agent)</h3>
+<table>
+    <tr>
+        <th>Lead Name</th>
+        <th>From Agent</th>
+        <th>Reason</th>
+        <th>Date</th>
+    </tr>
+    {% for r in reassignments_to %}
+    <tr>
+        <td>{{ r.lead.name }}</td>
+        <td>{{ r.from_agent.username }}</td>
+        <td>{{ r.reason }}</td>
+        <td>{{ r.reassigned_at }}</td>
+    </tr>
+    {% endfor %}
+</table>

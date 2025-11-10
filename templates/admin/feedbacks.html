@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Feedback History{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>All Feedbacks</h2>
+    <hr>
+    <div class="card">
+        <div class="card-body table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>Agent</th>
+                        <th>Date/Time</th>
+                        <th>Remarks</th>
+                        <th>Outcome</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fb in feedbacks %}
+                    <tr>
+                        <td>{{ fb.lead.name }}</td>
+                        <td>{{ fb.agent.username }}</td>
+                        <td>{{ fb.call_date }}</td>
+                        <td>{{ fb.remarks }}</td>
+                        <td>{{ fb.outcome }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5">No feedbacks yet</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

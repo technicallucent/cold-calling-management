@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <h2>Upload or Add Leads</h2>
+
+    <!-- Add Lead Form -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5>Add New Lead</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.add_lead') }}">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label">Name *</label>
+                <input type="text" class="form-control" name="name" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Mobile *</label>
+                <input type="text" class="form-control" name="mobile" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" name="email">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Pincode</label>
+                <input type="text" class="form-control" name="pincode">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label">Project Name</label>
+                <input type="text" class="form-control" name="project_name">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Source</label>
+                <input type="text" class="form-control" name="source">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Year</label>
+                <input type="number" class="form-control" name="year">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Location</label>
+                <input type="text" class="form-control" name="location">
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Lead</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Upload CSV/Excel -->
+    <div class="card">
+      <div class="card-header">
+        <h5>Upload Leads from CSV/Excel</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.upload_leads') }}" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label">Select File</label>
+            <input type="file" class="form-control" name="file" accept=".csv,.xlsx,.xls" required>
+            <div class="form-text">
+              File must contain at least 'mobile' column. Optional: name, email, pincode, project_name, source, year, location.
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success">Upload Leads</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

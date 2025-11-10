@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Agent History{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Agent History - {{ agent.username }}</h2>
+    <hr>
+
+    <div class="card mb-3">
+        <div class="card-header">Summary</div>
+        <div class="card-body">
+            <p><strong>Total Assigned Leads:</strong> {{ assigned_leads|length }}</p>
+            <p><strong>Total Feedbacks:</strong> {{ feedbacks|length }}</p>
+            <p><strong>Reassignments Made:</strong> {{ reassignments_from|length }}</p>
+            <p><strong>Reassignments Received:</strong> {{ reassignments_to|length }}</p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Assigned Leads</div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>Project</th>
+                        <th>Status</th>
+                        <th>Assigned Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lead in assigned_leads %}
+                    <tr>
+                        <td>{{ lead.name }}</td>
+                        <td>{{ lead.project_name }}</td>
+                        <td>{{ lead.status }}</td>
+                        <td>{{ lead.assigned_date }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4">No assigned leads</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Feedbacks</div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>Date</th>
+                        <th>Remarks</th>
+                        <th>Outcome</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fb in feedbacks %}
+                    <tr>
+                        <td>{{ fb.lead.name }}</td>
+                        <td>{{ fb.call_date }}</td>
+                        <td>{{ fb.remarks }}</td>
+                        <td>{{ fb.outcome }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4">No feedback yet</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Reassignments Made</div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>To Agent</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reassignments_from %}
+                    <tr>
+                        <td>{{ r.lead.name }}</td>
+                        <td>{{ r.to_agent.username }}</td>
+                        <td>{{ r.reassigned_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3">No reassignments made</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Reassignments Received</div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>From Agent</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reassignments_to %}
+                    <tr>
+                        <td>{{ r.lead.name }}</td>
+                        <td>{{ r.from_agent.username }}</td>
+                        <td>{{ r.reassigned_at }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3">No reassignments received</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

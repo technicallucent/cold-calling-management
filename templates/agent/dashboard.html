@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>Agent Dashboard</h2>
+        
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-white bg-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4>{{ assigned_leads }}</h4>
+                                <p>Total Assigned Leads</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-users fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-success">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4>{{ completed_leads }}</h4>
+                                <p>Completed Leads</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-check-circle fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-warning">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4>{{ pending_leads }}</h4>
+                                <p>Pending Leads</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-clock fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="d-grid gap-2">
+                                    <a href="{{ url_for('agent.my_leads') }}" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-list me-2"></i>View My Leads
+                                    </a>
+                                    <a href="{{ url_for('agent.my_leads') }}" class="btn btn-warning btn-lg">
+                                        <i class="fas fa-phone me-2"></i>Start Calling
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-grid gap-2">
+                                    <a href="{{ url_for('agent.all_feedback') }}" class="btn btn-info btn-lg">
+                                        <i class="fas fa-history me-2"></i>All Feedback
+                                    </a>
+                                    <button class="btn btn-secondary btn-lg" disabled>
+                                        <i class="fas fa-chart-bar me-2"></i>My Performance
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Today's Stats</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            <div class="list-group-item d-flex justify-content-between">
+                                <span>Calls Made:</span>
+                                <strong>0</strong>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between">
+                                <span>Interested Leads:</span>
+                                <strong>0</strong>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between">
+                                <span>Not Interested:</span>
+                                <strong>0</strong>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between">
+                                <span>Follow-up Required:</span>
+                                <strong>0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

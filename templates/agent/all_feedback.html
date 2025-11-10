@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-4">All Feedback</h2>
+
+{% if feedbacks %}
+<div class="table-responsive">
+    <table class="table table-striped table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Lead ID</th>
+                <th>Project Interested</th>
+                <th>Location Preferred</th>
+                <th>Configuration Interested</th>
+                <th>Budget Comfortable</th>
+                <th>Interest Level</th>
+                <th>Possession Timeline</th>
+                <th>Additional Notes</th>
+                <th>Recording</th>
+                <th>Created At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for feedback in feedbacks %}
+            <tr>
+                <td>{{ feedback.id }}</td>
+                <td>{{ feedback.lead_id }}</td>
+                <td>{{ feedback.project_interested or '-' }}</td>
+                <td>{{ feedback.location_preferred or '-' }}</td>
+                <td>{{ feedback.configuration_interested or '-' }}</td>
+                <td>{{ feedback.budget_comfortable or '-' }}</td>
+                <td>{{ feedback.interest_level.value if feedback.interest_level else '-' }}</td>
+                <td>{{ feedback.possession_timeline or '-' }}</td>
+                <td>{{ feedback.additional_notes or '-' }}</td>
+                <td>
+                    {% if feedback.recording_path %}
+                        <a href="{{ url_for('static', filename=feedback.recording_path) }}" target="_blank">
+                            <i class="fas fa-play"></i> Play
+                        </a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ feedback.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-center py-4">
+    <i class="fas fa-comment-dots fa-3x text-muted mb-3"></i>
+    <h5>No feedback found.</h5>
+</div>
+{% endif %}
+
+<a href="{{ url_for('agent.dashboard') }}" class="btn btn-secondary mt-3">Back to Dashboard</a>
+{% endblock %}
