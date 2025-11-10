@@ -44,7 +44,7 @@ def create_app():
         return redirect(url_for('auth.login'))
     
     return app
-
+app = create_app()
 if __name__ == '__main__':
     app = create_app()
     with app.app_context():
@@ -54,4 +54,5 @@ if __name__ == '__main__':
         from routes.auth_routes import create_admin_user
         create_admin_user()
         
+
     app.run(debug=True)
