@@ -4,3 +4,4 @@ flask_sqlalchemy
 pandas
 SQLAlchemy
 Werkzeug
+gunicorn
