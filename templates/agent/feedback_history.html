@@ -1,126 +1,253 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+
+{% block title %}Feedback History - {{ lead.name }} - Call Center System{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Feedback History for {{ lead.name }}</h2>
-            <a href="{{ url_for('agent.my_leads') }}" class="btn btn-secondary">
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Feedback History</h1>
+            <p class="text-muted mb-0">All feedback and call activities for {{ lead.name }}</p>
+        </div>
+        <div class="text-end">
+            <a href="{{ url_for('agent.my_leads') }}" class="btn btn-secondary me-2">
                 <i class="fas fa-arrow-left me-2"></i>Back to Leads
             </a>
+            <a href="{{ url_for('agent.call_lead', lead_id=lead.id) }}" class="btn btn-primary">
+                <i class="fas fa-phone me-2"></i>Call Again
+            </a>
         </div>
+    </div>
 
-        <!-- Lead Information -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5>Lead Information</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3"><strong>Name:</strong> {{ lead.name }}</div>
-                    <div class="col-md-3"><strong>Mobile:</strong> {{ lead.mobile }}</div>
-                    <div class="col-md-3"><strong>Email:</strong> {{ lead.email or 'N/A' }}</div>
-                    <div class="col-md-3"><strong>Project:</strong> {{ lead.project_name }}</div>
-                </div>
-                <div class="row mt-2">
-                    <div class="col-md-3"><strong>Location:</strong> {{ lead.location }}</div>
-                    <div class="col-md-3"><strong>Pincode:</strong> {{ lead.pincode or 'N/A' }}</div>
-                    <div class="col-md-3"><strong>Source:</strong> {{ lead.source or 'N/A' }}</div>
-                    <div class="col-md-3"><strong>Status:</strong> 
-                        <span class="badge bg-{{ 'success' if lead.status == 'completed' else 'warning' }}">
-                            {{ lead.status|title }}
-                        </span>
+    <!-- Lead Summary -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <h5 class="card-title">{{ lead.name }}</h5>
+                    <div class="row mt-3">
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong><i class="fas fa-mobile-alt me-2 text-muted"></i>Mobile:</strong> {{ lead.mobile }}</p>
+                            {% if lead.email %}
+                            <p class="mb-1"><strong><i class="fas fa-envelope me-2 text-muted"></i>Email:</strong> {{ lead.email }}</p>
+                            {% endif %}
+                            <p class="mb-1"><strong><i class="fas fa-building me-2 text-muted"></i>Project:</strong> {{ lead.project_name }}</p>
+                        </div>
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong><i class="fas fa-map-marker-alt me-2 text-muted"></i>Location:</strong> {{ lead.location }}</p>
+                            <p class="mb-1"><strong><i class="fas fa-calendar me-2 text-muted"></i>Assigned:</strong> 
+                                {{ lead.assigned_date.strftime('%Y-%m-%d') if lead.assigned_date else 'N/A' }}
+                            </p>
+                            <p class="mb-1"><strong><i class="fas fa-tag me-2 text-muted"></i>Status:</strong> 
+                                <span class="badge 
+                                    {% if lead.status == 'completed' %}bg-success
+                                    {% elif lead.status == 'interested' %}bg-success
+                                    {% elif lead.status == 'not_interested' %}bg-danger
+                                    {% elif lead.status == 'callback' %}bg-warning
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ lead.status|replace('_', ' ')|title }}
+                                </span>
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Feedback History -->
-        <div class="card">
-            <div class="card-header">
-                <h5>Call Feedback History ({{ feedbacks|length }} records)</h5>
-            </div>
-            <div class="card-body">
-                {% if feedbacks %}
-                <div class="table-responsive">
-                    <table class="table table-striped table-bordered">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Date & Time</th>
-                                <th>Agent</th>
-                                <th>Interest Level</th>
-                                <th>Project Interested</th>
-                                <th>Location Preferred</th>
-                                <th>Configuration Interested</th>
-                                <th>Budget Comfortable</th>
-                                <th>Timeline</th>
-                                <th>Recording</th>
-                                <th>Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for feedback in feedbacks %}
-                            <tr>
-                                <td>{{ feedback.call_date.strftime('%Y-%m-%d %H:%M') }}</td>
-                                <td>{{ feedback.agent.username }}</td>
-                                <td>
-                                    {% set level = feedback.interest_level.value if feedback.interest_level else 'not_interested' %}
-                                    <span class="badge bg-{{
-                                        'success' if level == 'high' 
-                                        else 'warning' if level == 'medium'
-                                        else 'secondary' if level == 'low'
-                                        else 'danger'
-                                    }}">{{ level|replace('_', ' ')|title }}</span>
-                                </td>
-                                <td>{{ feedback.project_interested or 'N/A' }}</td>
-                                <td>{{ feedback.location_preferred or 'N/A' }}</td>
-                                <td>{{ feedback.configuration_interested or 'N/A' }}</td>
-                                <td>{{ feedback.budget_comfortable or 'N/A' }}</td>
-                                <td>{{ feedback.possession_timeline or 'N/A' }}</td>
-                                <td>
-                                    {% if feedback.recording_path %}
-                                    <audio controls style="width: 150px; height: 40px;">
-                                        <source src="{{ url_for('static', filename=feedback.recording_path) }}" type="audio/mpeg">
-                                        Your browser does not support the audio element.
-                                    </audio>
-                                    {% else %}
-                                    <span class="text-muted">No recording</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if feedback.additional_notes %}
-                                    <button type="button" class="btn btn-sm btn-info" data-bs-toggle="popover" 
-                                            title="Additional Notes" data-bs-content="{{ feedback.additional_notes }}">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    {% else %}
-                                    <span class="text-muted">No notes</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="col-md-4 text-md-end">
+                    <div class="h4 text-primary mb-2">{{ call_activity_data|length }}</div>
+                    <small class="text-muted">Total Call Sessions</small>
                 </div>
-                {% else %}
-                <div class="text-center py-4">
-                    <i class="fas fa-comment-slash fa-3x text-muted mb-3"></i>
-                    <h5>No feedback records found</h5>
-                    <p class="text-muted">No call feedback has been added for this lead yet.</p>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
-<script>
-// Initialize Bootstrap popovers
-var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
-    return new bootstrap.Popover(popoverTriggerEl);
-});
-</script>
+    <!-- Combined Call + Feedback Timeline -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 py-3">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-phone text-primary me-2"></i>Call & Feedback Timeline
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if call_activity_data %}
+            <div class="timeline">
+                {% for group in call_activity_data %}
+                <div class="timeline-item {{ loop.cycle('timeline-item-left', 'timeline-item-right') }}">
+                    <div class="timeline-point bg-primary">
+                        <i class="fas fa-phone text-white"></i>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-phone-volume me-2"></i>
+                                    Call Session ID: {{ group.call_log_id or 'Manual Entry' }}
+                                </h6>
+
+                                <!-- Show All Call Activities -->
+                                {% if group.call_logs %}
+                                    {% for log in group.call_logs %}
+                                    <div class="border-start border-3 border-primary ps-3 mb-3">
+                                        <strong>{{ log.message }}</strong><br>
+                                        <small class="text-muted">{{ log.created_at.strftime('%b %d, %Y %I:%M %p') }}</small>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted fst-italic">No call activity logs found for this session.</p>
+                                {% endif %}
+
+                                <!-- Show Feedbacks (Full Details) -->
+                                {% if group.feedbacks %}
+                                <h6 class="mt-4 mb-3 text-primary">
+                                    <i class="fas fa-comment-dots me-2"></i>Feedback Details
+                                </h6>
+
+                                {% for feedback in group.feedbacks %}
+                                <div class="border rounded p-3 mb-4 bg-light">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="card-title mb-0 text-capitalize">
+                                            {{ feedback.feedback_type.value|replace('_', ' ') }}
+                                        </h6>
+                                        <small class="text-muted">{{ feedback.created_at.strftime('%b %d, %Y %I:%M %p') }}</small>
+                                    </div>
+
+                                    {% if feedback.feedback_type.value == 'interested' %}
+                                    <div class="row mt-3">
+                                        {% if feedback.project_interested %}
+                                        <div class="col-sm-6 mb-2">
+                                            <strong>Project Interested:</strong> {{ feedback.project_interested }}
+                                        </div>
+                                        {% endif %}
+                                        {% if feedback.location_preferred %}
+                                        <div class="col-sm-6 mb-2">
+                                            <strong>Location Preferred:</strong> {{ feedback.location_preferred }}
+                                        </div>
+                                        {% endif %}
+                                        {% if feedback.configuration_interested %}
+                                        <div class="col-sm-6 mb-2">
+                                            <strong>Configuration:</strong> {{ feedback.configuration_interested }}
+                                        </div>
+                                        {% endif %}
+                                        {% if feedback.budget_comfortable %}
+                                        <div class="col-sm-6 mb-2">
+                                            <strong>Budget:</strong> {{ feedback.budget_comfortable }}
+                                        </div>
+                                        {% endif %}
+                                        {% if feedback.interest_level %}
+                                        <div class="col-sm-6 mb-2">
+                                            <strong>Interest Level:</strong> 
+                                            <span class="badge 
+                                                {% if feedback.interest_level.value == 'high' %}bg-success
+                                                {% elif feedback.interest_level.value == 'medium' %}bg-warning
+                                                {% else %}bg-secondary{% endif %}">
+                                                {{ feedback.interest_level.value|title }}
+                                            </span>
+                                        </div>
+                                        {% endif %}
+                                        {% if feedback.possession_timeline %}
+                                        <div class="col-sm-6 mb-2">
+                                            <strong>Timeline:</strong> {{ feedback.possession_timeline }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+
+                                    {% elif feedback.feedback_type.value == 'not_interested' %}
+                                    <div class="mt-3">
+                                        {% if feedback.not_interested_reason %}
+                                        <p><strong>Reason:</strong> {{ feedback.not_interested_reason|replace('_', ' ')|title }}</p>
+                                        {% endif %}
+                                    </div>
+
+                                    {% elif feedback.feedback_type.value == 'callback' %}
+                                    <div class="row mt-3">
+                                        {% if feedback.callback_time %}
+                                        <div class="col-sm-6 mb-2">
+                                            <strong>Callback Time:</strong> {{ feedback.callback_time.strftime('%b %d, %Y %I:%M %p') }}
+                                        </div>
+                                        {% endif %}
+                                        {% if feedback.callback_priority %}
+                                        <div class="col-sm-6 mb-2">
+                                            <strong>Priority:</strong> 
+                                            <span class="badge 
+                                                {% if feedback.callback_priority == 'high' %}bg-danger
+                                                {% elif feedback.callback_priority == 'medium' %}bg-warning
+                                                {% else %}bg-info{% endif %}">
+                                                {{ feedback.callback_priority|title }}
+                                            </span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+
+                                    {% if feedback.additional_notes %}
+                                    <div class="mt-3">
+                                        <strong>Additional Notes:</strong>
+                                        <p class="mb-0 mt-1 text-muted">{{ feedback.additional_notes }}</p>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if feedback.callback_notes %}
+                                    <div class="mt-3">
+                                        <strong>Callback Notes:</strong>
+                                        <p class="mb-0 mt-1 text-muted">{{ feedback.callback_notes }}</p>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if feedback.recording_path %}
+                                    <div class="mt-3">
+                                        <strong>Recording:</strong>
+                                        <div class="mt-1">
+                                            <audio controls class="w-100">
+                                                <source src="{{ url_for('static', filename=feedback.recording_path) }}" type="audio/mpeg">
+                                                Your browser does not support the audio element.
+                                            </audio>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if feedback.call_duration %}
+                                    <div class="mt-3">
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>
+                                            Call Duration: {{ (feedback.call_duration // 60) }}:{{ "%02d" % (feedback.call_duration % 60) }}
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                                {% else %}
+                                <p class="text-muted fst-italic mb-0">No feedback recorded for this call session.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-comments fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Call Activity Yet</h5>
+                <p class="text-muted">No call logs or feedbacks recorded for this lead.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline { position: relative; padding: 20px 0; }
+.timeline::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: #e9ecef; transform: translateX(-50%); }
+.timeline-item { position: relative; margin-bottom: 30px; display: flex; align-items: flex-start; }
+.timeline-item-left { justify-content: flex-start; padding-right: 50%; }
+.timeline-item-right { justify-content: flex-end; padding-left: 50%; }
+.timeline-point { position: absolute; left: 50%; top: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transform: translateX(-50%); z-index: 2; }
+.timeline-content { width: 90%; max-width: 500px; }
+@media (max-width: 768px) {
+    .timeline::before { left: 20px; }
+    .timeline-item { padding-left: 50px !important; padding-right: 0 !important; justify-content: flex-start !important; }
+    .timeline-point { left: 20px; }
+    .timeline-content { width: 100%; }
+}
+</style>
 {% endblock %}

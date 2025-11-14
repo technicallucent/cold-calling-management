@@ -1,16 +1,18 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment,LeadAssignmentHistory
+from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, LeadAssignmentHistory, CallLog, CallStatus, FeedbackType, InterestLevel
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, and_
+
 admin_bp = Blueprint('admin', __name__)
 
 # -----------------------------
-# Helper
+# Helper Functions
 # -----------------------------
 def allowed_file(filename, allowed_extensions):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
@@ -18,8 +20,52 @@ def allowed_file(filename, allowed_extensions):
 def admin_required():
     if current_user.role != UserRole.ADMIN:
         flash('Access denied!', 'error')
-        return redirect(url_for('agent.dashboard'))
+        return False
     return True
+
+def get_admin_stats():
+    """Get comprehensive admin dashboard statistics"""
+    total_leads = Lead.query.count()
+    total_agents = User.query.filter_by(role=UserRole.AGENT, is_active=True).count()
+    new_leads = Lead.query.filter_by(status='new').count()
+    assigned_leads = Lead.query.filter_by(status='assigned').count()
+    completed_leads = Lead.query.filter_by(status='completed').count()
+    interested_leads = Lead.query.filter_by(status='interested').count()
+    
+    # Today's stats
+    today = datetime.utcnow().date()
+    today_calls = CallLog.query.filter(func.date(CallLog.call_time) == today).count()
+    
+    # Recent activity
+    recent_feedbacks = LeadFeedback.query.order_by(LeadFeedback.created_at.desc()).limit(5).all()
+    recent_reassignments = LeadReassignment.query.order_by(LeadReassignment.reassigned_at.desc()).limit(5).all()
+    
+    # Agent performance stats
+    agent_stats = db.session.query(
+        User.username,
+        func.count(Lead.id).label('total_leads'),
+        func.count(LeadFeedback.id).label('total_feedbacks'),
+        func.avg(CallLog.duration_seconds).label('avg_call_duration')
+    ).select_from(User)\
+     .outerjoin(Lead, User.id == Lead.assigned_agent_id)\
+     .outerjoin(LeadFeedback, User.id == LeadFeedback.agent_id)\
+     .outerjoin(CallLog, User.id == CallLog.agent_id)\
+     .filter(User.role == UserRole.AGENT, User.is_active == True)\
+     .group_by(User.id, User.username)\
+     .all()
+    
+    return {
+        'total_leads': total_leads,
+        'total_agents': total_agents,
+        'new_leads': new_leads,
+        'assigned_leads': assigned_leads,
+        'completed_leads': completed_leads,
+        'interested_leads': interested_leads,
+        'today_calls': today_calls,
+        'recent_feedbacks': recent_feedbacks,
+        'recent_reassignments': recent_reassignments,
+        'agent_stats': agent_stats
+    }
 
 # -----------------------------
 # Dashboard
@@ -30,17 +76,12 @@ def dashboard():
     if not admin_required():
         return redirect(url_for('agent.dashboard'))
     
-    total_leads = Lead.query.count()
-    total_agents = User.query.filter_by(role=UserRole.AGENT, is_active=True).count()
-    new_leads = Lead.query.filter_by(status='new').count()
+    stats = get_admin_stats()
     
-    return render_template('admin/dashboard.html', 
-                           total_leads=total_leads,
-                           total_agents=total_agents,
-                           new_leads=new_leads)
+    return render_template('admin/dashboard.html', **stats)
 
 # -----------------------------
-# Upload / Add Leads Page
+# Upload / Add Leads
 # -----------------------------
 @admin_bp.route('/upload-leads', methods=['GET'])
 @login_required
@@ -68,6 +109,12 @@ def add_lead():
         flash('Mobile number is required', 'error')
         return redirect(url_for('admin.leads_management'))
     
+    # Check for duplicate mobile
+    existing_lead = Lead.query.filter_by(mobile=mobile).first()
+    if existing_lead:
+        flash('Lead with this mobile number already exists', 'error')
+        return redirect(url_for('admin.leads_management'))
+    
     lead = Lead(
         name=name,
         email=email,
@@ -79,9 +126,14 @@ def add_lead():
         location=location
     )
     
-    db.session.add(lead)
-    db.session.commit()
-    flash('Lead added successfully!', 'success')
+    try:
+        db.session.add(lead)
+        db.session.commit()
+        flash('Lead added successfully!', 'success')
+    except IntegrityError:
+        db.session.rollback()
+        flash('Error adding lead. Please try again.', 'error')
+    
     return redirect(url_for('admin.leads_management'))
 
 @admin_bp.route('/upload_leads', methods=['POST'])
@@ -101,31 +153,55 @@ def upload_leads():
     
     if file and allowed_file(file.filename, {'csv', 'xlsx', 'xls'}):
         filename = secure_filename(file.filename)
-        filepath = os.path.join('uploads/csv_files', filename)
+        upload_dir = 'uploads/csv_files'
+        os.makedirs(upload_dir, exist_ok=True)
+        filepath = os.path.join(upload_dir, filename)
         file.save(filepath)
         
         try:
-            df = pd.read_csv(filepath) if filename.endswith('.csv') else pd.read_excel(filepath)
+            if filename.endswith('.csv'):
+                df = pd.read_csv(filepath)
+            else:
+                df = pd.read_excel(filepath)
+            
+            required_columns = ['name', 'mobile']
+            if not all(col in df.columns for col in required_columns):
+                flash('CSV must contain "name" and "mobile" columns', 'error')
+                return redirect(url_for('admin.leads_management'))
+            
             leads_added = 0
+            duplicates_skipped = 0
             
             for _, row in df.iterrows():
-                if 'mobile' not in df.columns or pd.isna(row['mobile']):
+                if pd.isna(row['mobile']):
                     continue
+                
+                # Check for duplicate mobile
+                mobile_str = str(row['mobile']).strip()
+                if Lead.query.filter_by(mobile=mobile_str).first():
+                    duplicates_skipped += 1
+                    continue
+                
                 lead = Lead(
-                    name=row.get('name', 'N/A'),
-                    email=row.get('email') or None,
-                    mobile=str(row['mobile']),
-                    pincode=row.get('pincode', 'N/A'),
-                    project_name=row.get('project_name', 'N/A'),
-                    source=row.get('source', 'N/A'),
-                    year=row.get('year') or None,
-                    location=row.get('location', 'N/A')
+                    name=str(row['name']).strip() if not pd.isna(row['name']) else 'N/A',
+                    email=str(row['email']).strip() if 'email' in df.columns and not pd.isna(row['email']) else None,
+                    mobile=mobile_str,
+                    pincode=str(row['pincode']).strip() if 'pincode' in df.columns and not pd.isna(row['pincode']) else 'N/A',
+                    project_name=str(row['project_name']).strip() if 'project_name' in df.columns and not pd.isna(row['project_name']) else 'N/A',
+                    source=str(row['source']).strip() if 'source' in df.columns and not pd.isna(row['source']) else 'N/A',
+                    year=int(row['year']) if 'year' in df.columns and not pd.isna(row['year']) else None,
+                    location=str(row['location']).strip() if 'location' in df.columns and not pd.isna(row['location']) else 'N/A'
                 )
                 db.session.add(lead)
                 leads_added += 1
             
             db.session.commit()
-            flash(f'Successfully added {leads_added} leads from file!', 'success')
+            
+            if duplicates_skipped > 0:
+                flash(f'Successfully added {leads_added} leads. Skipped {duplicates_skipped} duplicates.', 'warning')
+            else:
+                flash(f'Successfully added {leads_added} leads from file!', 'success')
+                
         except Exception as e:
             db.session.rollback()
             flash(f'Error processing file: {str(e)}', 'error')
@@ -157,13 +233,40 @@ def leads_management():
         query = query.filter(Lead.project_name.ilike(f"%{request.args['project_name']}%"))
     if request.args.get('pincode'):
         query = query.filter(Lead.pincode.ilike(f"%{request.args['pincode']}%"))
-    if request.args.get('status'):
+    if request.args.get('status') and request.args.get('status') != 'all':
         query = query.filter(Lead.status == request.args['status'])
+    if request.args.get('agent_id') and request.args.get('agent_id') != 'all':
+        query = query.filter(Lead.assigned_agent_id == request.args['agent_id'])
 
-    leads = query.order_by(Lead.id.desc()).all()
+    # Sorting
+    sort_by = request.args.get('sort_by', 'id')
+    sort_order = request.args.get('sort_order', 'desc')
+    
+    if sort_by == 'name':
+        query = query.order_by(Lead.name.asc() if sort_order == 'asc' else Lead.name.desc())
+    elif sort_by == 'created_at':
+        query = query.order_by(Lead.created_at.asc() if sort_order == 'asc' else Lead.created_at.desc())
+    elif sort_by == 'assigned_date':
+        query = query.order_by(Lead.assigned_date.asc() if sort_order == 'asc' else Lead.assigned_date.desc())
+    else:
+        query = query.order_by(Lead.id.asc() if sort_order == 'asc' else Lead.id.desc())
+
+    leads = query.all()
     agents = User.query.filter_by(role=UserRole.AGENT, is_active=True).all()
     
-    return render_template('admin/leads_management.html', leads=leads, agents=agents)
+    # Statistics for the page
+    total_leads = Lead.query.count()
+    new_leads = Lead.query.filter_by(status='new').count()
+    assigned_leads = Lead.query.filter_by(status='assigned').count()
+    completed_leads = Lead.query.filter_by(status='completed').count()
+    
+    return render_template('admin/leads_management.html', 
+                         leads=leads, 
+                         agents=agents,
+                         total_leads=total_leads,
+                         new_leads=new_leads,
+                         assigned_leads=assigned_leads,
+                         completed_leads=completed_leads)
 
 @admin_bp.route('/assign_lead', methods=['POST'])
 @login_required
@@ -173,6 +276,7 @@ def assign_lead():
     
     lead_id = request.form.get('lead_id')
     agent_id = request.form.get('agent_id')
+    assignment_note = request.form.get('assignment_note', 'Manual assignment by admin')
     
     lead = Lead.query.get(lead_id)
     agent = User.query.get(agent_id)
@@ -187,11 +291,12 @@ def assign_lead():
             lead_id=lead.id,
             from_agent_id=lead.assigned_agent_id,
             to_agent_id=agent.id,
-            reason='Manual reassignment by admin'
+            reason=f'Reassignment: {assignment_note}'
         )
         db.session.add(reassignment)
 
     # Assign the lead
+    previous_agent_id = lead.assigned_agent_id
     lead.assigned_agent_id = agent.id
     lead.assigned_date = datetime.utcnow()
     lead.status = 'assigned'
@@ -201,12 +306,18 @@ def assign_lead():
         lead_id=lead.id,
         agent_id=agent.id,
         assigned_by_id=current_user.id,
-        note='Manual assign' if not lead.assigned_agent_id else 'Reassigned manually'
+        previous_agent_id=previous_agent_id,
+        note=assignment_note
     )
     db.session.add(history)
 
-    db.session.commit()
-    flash('Lead assigned successfully!', 'success')
+    try:
+        db.session.commit()
+        flash(f'Lead assigned to {agent.username} successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error assigning lead. Please try again.', 'error')
+    
     return redirect(url_for('admin.leads_management'))
 
 @admin_bp.route('/bulk_assign', methods=['POST'])
@@ -217,6 +328,7 @@ def bulk_assign():
 
     lead_ids = request.form.getlist('lead_ids')
     agent_id = request.form.get('agent_id')
+    assignment_note = request.form.get('bulk_assignment_note', 'Bulk assignment by admin')
 
     if not lead_ids or not agent_id:
         flash('Select at least one lead and an agent.', 'error')
@@ -228,6 +340,8 @@ def bulk_assign():
         return redirect(url_for('admin.leads_management'))
 
     leads = Lead.query.filter(Lead.id.in_(lead_ids)).all()
+    assigned_count = 0
+    
     for lead in leads:
         # Track reassignment if already assigned
         if lead.assigned_agent_id and lead.assigned_agent_id != agent.id:
@@ -235,11 +349,12 @@ def bulk_assign():
                 lead_id=lead.id,
                 from_agent_id=lead.assigned_agent_id,
                 to_agent_id=agent.id,
-                reason='Bulk reassignment by admin'
+                reason=f'Bulk reassignment: {assignment_note}'
             )
             db.session.add(reassignment)
 
         # Assign lead
+        previous_agent_id = lead.assigned_agent_id
         lead.assigned_agent_id = agent.id
         lead.assigned_date = datetime.utcnow()
         lead.status = 'assigned'
@@ -249,86 +364,68 @@ def bulk_assign():
             lead_id=lead.id,
             agent_id=agent.id,
             assigned_by_id=current_user.id,
-            note='Bulk assign'
+            previous_agent_id=previous_agent_id,
+            note=assignment_note
         )
         db.session.add(history)
+        assigned_count += 1
 
-    db.session.commit()
-    flash(f'{len(leads)} leads assigned to {agent.username} successfully!', 'success')
+    try:
+        db.session.commit()
+        flash(f'{assigned_count} leads assigned to {agent.username} successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error assigning leads. Please try again.', 'error')
+    
+    return redirect(url_for('admin.leads_management'))
+
+@admin_bp.route('/delete_lead/<int:lead_id>', methods=['POST'])
+@login_required
+def delete_lead(lead_id):
+    if not admin_required():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    lead = Lead.query.get_or_404(lead_id)
+    
+    try:
+        # Delete related records first
+        LeadFeedback.query.filter_by(lead_id=lead_id).delete()
+        LeadReassignment.query.filter_by(lead_id=lead_id).delete()
+        LeadAssignmentHistory.query.filter_by(lead_id=lead_id).delete()
+        CallLog.query.filter_by(lead_id=lead_id).delete()
+        
+        # Delete the lead
+        db.session.delete(lead)
+        db.session.commit()
+        flash('Lead deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error deleting lead. Please try again.', 'error')
+    
+    return redirect(url_for('admin.leads_management'))
+
+@admin_bp.route('/update_lead_status', methods=['POST'])
+@login_required
+def update_lead_status():
+    if not admin_required():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    lead_id = request.form.get('lead_id')
+    new_status = request.form.get('status')
+    
+    lead = Lead.query.get(lead_id)
+    if lead:
+        lead.status = new_status
+        lead.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash('Lead status updated successfully!', 'success')
+    else:
+        flash('Lead not found', 'error')
+    
     return redirect(url_for('admin.leads_management'))
 
 # -----------------------------
-# Agent Details
-# -----------------------------
-@admin_bp.route('/agent/<int:agent_id>')
-@login_required
-def agent_details(agent_id):
-    if not admin_required():
-        return redirect(url_for('agent.dashboard'))
-    
-    agent = User.query.get_or_404(agent_id)
-    assigned_leads = Lead.query.filter_by(assigned_agent_id=agent.id).order_by(Lead.assigned_date.desc()).all()
-    feedbacks = LeadFeedback.query.filter_by(agent_id=agent.id).order_by(LeadFeedback.call_date.desc()).all()
-    reassignments_from = LeadReassignment.query.filter_by(from_agent_id=agent.id).order_by(LeadReassignment.reassigned_at.desc()).all()
-    reassignments_to = LeadReassignment.query.filter_by(to_agent_id=agent.id).order_by(LeadReassignment.reassigned_at.desc()).all()
-    
-    return render_template(
-        'admin/agent_details.html',
-        agent=agent,
-        assigned_leads=assigned_leads,
-        feedbacks=feedbacks,
-        reassignments_from=reassignments_from,
-        reassignments_to=reassignments_to
-    )
-@admin_bp.route('/agent/<int:agent_id>/history')
-@login_required
-def agent_history(agent_id):
-    if not admin_required():
-        return redirect(url_for('agent.dashboard'))
-    
-    agent = User.query.get_or_404(agent_id)
-    
-    # Leads assigned to this agent
-    assigned_leads = Lead.query.filter_by(assigned_agent_id=agent.id).order_by(Lead.assigned_date.desc()).all()
-    
-    # Feedbacks by this agent
-    feedbacks = LeadFeedback.query.filter_by(agent_id=agent.id).order_by(LeadFeedback.call_date.desc()).all()
-    
-    # Reassignments from this agent
-    reassignments_from = LeadReassignment.query.filter_by(from_agent_id=agent.id).order_by(LeadReassignment.reassigned_at.desc()).all()
-    
-    # Reassignments to this agent
-    reassignments_to = LeadReassignment.query.filter_by(to_agent_id=agent.id).order_by(LeadReassignment.reassigned_at.desc()).all()
-    
-    return render_template(
-        'admin/agent_history.html',
-        agent=agent,
-        assigned_leads=assigned_leads,
-        feedbacks=feedbacks,
-        reassignments_from=reassignments_from,
-        reassignments_to=reassignments_to
-    )
-@admin_bp.route('/reassignments')
-@login_required
-def reassignments_history():
-    if not admin_required():
-        return redirect(url_for('agent.dashboard'))
-    
-    reassignments = LeadReassignment.query.order_by(LeadReassignment.reassigned_at.desc()).all()
-    
-    return render_template('admin/reassignments.html', reassignments=reassignments)
-@admin_bp.route('/feedbacks')
-@login_required
-def feedbacks_history():
-    if not admin_required():
-        return redirect(url_for('agent.dashboard'))
-    
-    feedbacks = LeadFeedback.query.order_by(LeadFeedback.call_date.desc()).all()
-    
-    return render_template('admin/feedbacks.html', feedbacks=feedbacks)
-
-# -----------------------------
-# Agents Management
+# Agent Management
 # -----------------------------
 @admin_bp.route('/agents')
 @login_required
@@ -336,9 +433,31 @@ def agents_management():
     if not admin_required():
         return redirect(url_for('agent.dashboard'))
     
-    agents = User.query.filter_by(role=UserRole.AGENT).all()
-    return render_template('admin/agents.html', agents=agents)
-
+    agents = User.query.filter_by(role=UserRole.AGENT).order_by(User.created_at.desc()).all()
+    
+    # Get agent statistics
+    agent_stats = []
+    for agent in agents:
+        assigned_leads = Lead.query.filter_by(assigned_agent_id=agent.id).count()
+        completed_leads = Lead.query.filter_by(assigned_agent_id=agent.id, status='completed').count()
+        total_feedbacks = LeadFeedback.query.filter_by(agent_id=agent.id).count()
+        
+        # Today's calls
+        today = datetime.utcnow().date()
+        today_calls = CallLog.query.filter(
+            CallLog.agent_id == agent.id,
+            func.date(CallLog.call_time) == today
+        ).count()
+        
+        agent_stats.append({
+            'agent': agent,
+            'assigned_leads': assigned_leads,
+            'completed_leads': completed_leads,
+            'total_feedbacks': total_feedbacks,
+            'today_calls': today_calls
+        })
+    
+    return render_template('admin/agents.html', agent_stats=agent_stats)
 
 @admin_bp.route('/add_agent', methods=['POST'])
 @login_required
@@ -349,6 +468,8 @@ def add_agent():
     username = request.form.get('username')
     email = request.form.get('email')
     password = request.form.get('password')
+    phone_number = request.form.get('phone_number')
+    department = request.form.get('department')
 
     # Check for existing username
     if User.query.filter_by(username=username).first():
@@ -365,11 +486,13 @@ def add_agent():
         username=username,
         email=email,
         password=generate_password_hash(password),
-        role=UserRole.AGENT
+        role=UserRole.AGENT,
+        phone_number=phone_number,
+        department=department
     )
     
-    db.session.add(agent)
     try:
+        db.session.add(agent)
         db.session.commit()
         flash('Agent added successfully!', 'success')
     except IntegrityError:
@@ -377,7 +500,6 @@ def add_agent():
         flash('Error: Could not add agent. Please try again.', 'error')
 
     return redirect(url_for('admin.agents_management'))
-
 
 @admin_bp.route('/deactivate_agent/<int:agent_id>', methods=['POST'])
 @login_required
@@ -410,6 +532,92 @@ def activate_agent(agent_id):
         flash('Agent not found', 'error')
     
     return redirect(url_for('admin.agents_management'))
+
+@admin_bp.route('/reset_agent_password/<int:agent_id>', methods=['POST'])
+@login_required
+def reset_agent_password(agent_id):
+    if not admin_required():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    agent = User.query.get(agent_id)
+    if agent and agent.role == UserRole.AGENT:
+        new_password = request.form.get('new_password')
+        if new_password:
+            agent.password = generate_password_hash(new_password)
+            db.session.commit()
+            flash('Agent password reset successfully!', 'success')
+        else:
+            flash('New password is required', 'error')
+    else:
+        flash('Agent not found', 'error')
+    
+    return redirect(url_for('admin.agents_management'))
+
+# -----------------------------
+# Detailed Views
+# -----------------------------
+@admin_bp.route('/agent/<int:agent_id>')
+@login_required
+def agent_details(agent_id):
+    if not admin_required():
+        return redirect(url_for('agent.dashboard'))
+    
+    agent = User.query.get_or_404(agent_id)
+    
+    # Get comprehensive agent statistics
+    assigned_leads = Lead.query.filter_by(assigned_agent_id=agent.id).order_by(Lead.assigned_date.desc()).all()
+    feedbacks = LeadFeedback.query.filter_by(agent_id=agent.id).order_by(LeadFeedback.created_at.desc()).all()
+    call_logs = CallLog.query.filter_by(agent_id=agent.id).order_by(CallLog.call_time.desc()).limit(50).all()
+    
+    # Performance metrics
+    total_calls = CallLog.query.filter_by(agent_id=agent.id).count()
+    completed_calls = CallLog.query.filter_by(agent_id=agent.id, status=CallStatus.COMPLETED).count()
+    interested_leads = LeadFeedback.query.filter_by(agent_id=agent.id, feedback_type=FeedbackType.INTERESTED).count()
+    
+    # Recent activity (last 7 days)
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    recent_calls = CallLog.query.filter(
+        CallLog.agent_id == agent.id,
+        CallLog.call_time >= week_ago
+    ).count()
+    
+    return render_template(
+        'admin/agent_details.html',
+        agent=agent,
+        assigned_leads=assigned_leads,
+        feedbacks=feedbacks,
+        call_logs=call_logs,
+        total_calls=total_calls,
+        completed_calls=completed_calls,
+        interested_leads=interested_leads,
+        recent_calls=recent_calls
+    )
+
+@admin_bp.route('/agent/<int:agent_id>/history')
+@login_required
+def agent_history(agent_id):
+    if not admin_required():
+        return redirect(url_for('agent.dashboard'))
+    
+    agent = User.query.get_or_404(agent_id)
+    
+    # Get all agent activities
+    assigned_leads = Lead.query.filter_by(assigned_agent_id=agent.id).order_by(Lead.assigned_date.desc()).all()
+    feedbacks = LeadFeedback.query.filter_by(agent_id=agent.id).order_by(LeadFeedback.created_at.desc()).all()
+    reassignments_from = LeadReassignment.query.filter_by(from_agent_id=agent.id).order_by(LeadReassignment.reassigned_at.desc()).all()
+    reassignments_to = LeadReassignment.query.filter_by(to_agent_id=agent.id).order_by(LeadReassignment.reassigned_at.desc()).all()
+    call_logs = CallLog.query.filter_by(agent_id=agent.id).order_by(CallLog.call_time.desc()).all()
+    
+    return render_template(
+        'admin/agent_history.html',
+        agent=agent,
+        assigned_leads=assigned_leads,
+        feedbacks=feedbacks,
+        reassignments_from=reassignments_from,
+        reassignments_to=reassignments_to,
+        call_logs=call_logs
+    )
+
 @admin_bp.route('/lead/<int:lead_id>')
 @login_required
 def lead_details(lead_id):
@@ -418,15 +626,157 @@ def lead_details(lead_id):
     
     lead = Lead.query.get_or_404(lead_id)
     
-    # Feedback history for this lead
-    feedbacks = LeadFeedback.query.filter_by(lead_id=lead.id).order_by(LeadFeedback.call_date.desc()).all()
-    
-    # Reassignment history for this lead
+    # Get comprehensive lead history
+    feedbacks = LeadFeedback.query.filter_by(lead_id=lead.id).order_by(LeadFeedback.created_at.desc()).all()
     reassignments = LeadReassignment.query.filter_by(lead_id=lead.id).order_by(LeadReassignment.reassigned_at.desc()).all()
+    call_logs = CallLog.query.filter_by(lead_id=lead.id).order_by(CallLog.call_time.desc()).all()
+    assignment_history = LeadAssignmentHistory.query.filter_by(lead_id=lead.id).order_by(LeadAssignmentHistory.assigned_at.desc()).all()
     
     return render_template(
         'admin/lead_details.html',
         lead=lead,
         feedbacks=feedbacks,
-        reassignments=reassignments
+        reassignments=reassignments,
+        call_logs=call_logs,
+        assignment_history=assignment_history
     )
+
+@admin_bp.route('/reassignments')
+@login_required
+def reassignments_history():
+    if not admin_required():
+        return redirect(url_for('agent.dashboard'))
+    
+    reassignments = LeadReassignment.query.order_by(LeadReassignment.reassigned_at.desc()).all()
+    
+    return render_template('admin/reassignments.html', reassignments=reassignments)
+
+@admin_bp.route('/feedbacks')
+@login_required
+def feedbacks_history():
+    if not admin_required():
+        return redirect(url_for('agent.dashboard'))
+    
+    feedbacks = LeadFeedback.query.order_by(LeadFeedback.created_at.desc()).all()
+    
+    return render_template('admin/feedbacks.html', feedbacks=feedbacks)
+
+@admin_bp.route('/call-logs')
+@login_required
+def call_logs_history():
+    if not admin_required():
+        return redirect(url_for('agent.dashboard'))
+    
+    call_logs = CallLog.query.order_by(CallLog.call_time.desc()).all()
+    
+    return render_template('admin/call_logs.html', call_logs=call_logs)
+
+# -----------------------------
+# Reports & Analytics
+# -----------------------------
+@admin_bp.route('/reports')
+@login_required
+def reports():
+    if not admin_required():
+        return redirect(url_for('agent.dashboard'))
+    
+    # Basic statistics
+    total_leads = Lead.query.count()
+    total_agents = User.query.filter_by(role=UserRole.AGENT, is_active=True).count()
+    total_calls = CallLog.query.count()
+    
+    # Lead status distribution
+    status_distribution = db.session.query(
+        Lead.status,
+        func.count(Lead.id).label('count')
+    ).group_by(Lead.status).all()
+    
+    # Call status distribution
+    call_status_distribution = db.session.query(
+        CallLog.status,
+        func.count(CallLog.id).label('count')
+    ).group_by(CallLog.status).all()
+    
+    # Feedback type distribution
+    feedback_distribution = db.session.query(
+        LeadFeedback.feedback_type,
+        func.count(LeadFeedback.id).label('count')
+    ).group_by(LeadFeedback.feedback_type).all()
+    
+    # Monthly trends (last 6 months)
+    six_months_ago = datetime.utcnow() - timedelta(days=180)
+    
+    monthly_leads = db.session.query(
+        func.date_trunc('month', Lead.created_at).label('month'),
+        func.count(Lead.id).label('count')
+    ).filter(Lead.created_at >= six_months_ago)\
+     .group_by(func.date_trunc('month', Lead.created_at))\
+     .order_by('month').all()
+    
+    monthly_calls = db.session.query(
+        func.date_trunc('month', CallLog.call_time).label('month'),
+        func.count(CallLog.id).label('count')
+    ).filter(CallLog.call_time >= six_months_ago)\
+     .group_by(func.date_trunc('month', CallLog.call_time))\
+     .order_by('month').all()
+    
+    return render_template(
+        'admin/reports.html',
+        total_leads=total_leads,
+        total_agents=total_agents,
+        total_calls=total_calls,
+        status_distribution=status_distribution,
+        call_status_distribution=call_status_distribution,
+        feedback_distribution=feedback_distribution,
+        monthly_leads=monthly_leads,
+        monthly_calls=monthly_calls
+    )
+
+# -----------------------------
+# API Endpoints for Data
+# -----------------------------
+@admin_bp.route('/api/lead_stats')
+@login_required
+def api_lead_stats():
+    if not admin_required():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    stats = {
+        'total': Lead.query.count(),
+        'new': Lead.query.filter_by(status='new').count(),
+        'assigned': Lead.query.filter_by(status='assigned').count(),
+        'completed': Lead.query.filter_by(status='completed').count(),
+        'interested': Lead.query.filter_by(status='interested').count()
+    }
+    
+    return jsonify(stats)
+
+@admin_bp.route('/api/agent_performance')
+@login_required
+def api_agent_performance():
+    if not admin_required():
+        return jsonify({'error': 'Access denied'}), 403
+    
+    performance_data = db.session.query(
+        User.username,
+        func.count(Lead.id).label('assigned_leads'),
+        func.count(LeadFeedback.id).label('completed_feedbacks'),
+        func.avg(CallLog.duration_seconds).label('avg_call_duration')
+    ).select_from(User)\
+     .outerjoin(Lead, User.id == Lead.assigned_agent_id)\
+     .outerjoin(LeadFeedback, User.id == LeadFeedback.agent_id)\
+     .outerjoin(CallLog, User.id == CallLog.agent_id)\
+     .filter(User.role == UserRole.AGENT, User.is_active == True)\
+     .group_by(User.id, User.username)\
+     .all()
+    
+    result = []
+    for data in performance_data:
+        result.append({
+            'agent': data.username,
+            'assigned_leads': data.assigned_leads or 0,
+            'completed_feedbacks': data.completed_feedbacks or 0,
+            'avg_call_duration': round(data.avg_call_duration or 0, 2)
+        })
+    
+    return jsonify(result)

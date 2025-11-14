@@ -54,5 +54,4 @@ if __name__ == '__main__':
         from routes.auth_routes import create_admin_user
         create_admin_user()
         
-
     app.run(debug=True)

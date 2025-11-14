@@ -1,151 +1,159 @@
 {% extends "base.html" %}
 
+{% block title %}Admin Dashboard - Call Center System{% endblock %}
+
 {% block content %}
-<div class="row">
-    <div class="col-12">
-
-        <!-- Statistics Cards -->
-        <div class="row mb-4">
-            <!-- Total Leads with Blue Gradient -->
-            <div class="col-md-3 mb-3">
-                <a href="{{ url_for('admin.leads_management') }}" class="text-decoration-none">
-                    <div class="card text-white"
-                        style="background: linear-gradient(135deg, #1e90ff, #00bfff); border: none;">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h4>{{ total_leads }}</h4>
-                                    <p>Total Leads</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="fas fa-users fa-2x"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Active Agents with White BG and Green Border -->
-            <div class="col-md-3 mb-3">
-                <a href="{{ url_for('admin.agents_management') }}" class="text-decoration-none">
-                    <div class="card text-dark border border-success" style="background-color: #fff;">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h4>{{ total_agents }}</h4>
-                                    <p>Active Agents</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="fas fa-user-tie fa-2x text-success"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- New Leads with White BG and Yellow Border -->
-            <div class="col-md-3 mb-3">
-                <a href="{{ url_for('admin.upload_leads_page') }}" class="text-decoration-none">
-                    <div class="card text-dark border border-warning" style="background-color: #fff;">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h4>{{ new_leads }}</h4>
-                                    <p>New Leads</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="fas fa-plus-circle fa-2x text-warning"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Total Feedbacks -->
-            <div class="col-md-3 mb-3">
-                <a href="{{ url_for('admin.feedbacks_history') }}" class="text-decoration-none">
-                    <div class="card text-white" style="background: linear-gradient(135deg, #ff7f50, #ff6347); border: none;">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h4>{{ total_feedbacks }}</h4>
-                                    <p>Total Feedbacks</p>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="fas fa-comment fa-2x"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Admin Dashboard</h1>
+            <p class="text-muted mb-0">Welcome back, {{ current_user.username }}! Here’s an overview of your system performance.</p>
+        </div>
+        <div class="text-end">
+            <div class="btn-group">
+                <a href="{{ url_for('admin.upload_leads_page') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Add New Lead
                 </a>
             </div>
         </div>
+    </div>
 
-        <!-- Quick Actions -->
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Quick Actions</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-grid gap-2">
-                            <a href="{{ url_for('admin.leads_management') }}" class="btn btn-primary">
-                                <i class="fas fa-users me-2"></i>Manage Leads
-                            </a>
-                            <a href="{{ url_for('admin.agents_management') }}" class="btn btn-success">
-                                <i class="fas fa-user-tie me-2"></i>Manage Agents
-                            </a>
-                            <a href="{{ url_for('admin.upload_leads_page') }}" class="btn btn-info">
-                                <i class="fas fa-plus me-2"></i>Add New Lead
-                            </a>
-                            <a href="{{ url_for('admin.feedbacks_history') }}" class="btn btn-warning text-white">
-                                <i class="fas fa-comment me-2"></i>View Feedbacks
-                            </a>
-                            <a href="{{ url_for('admin.reassignments_history') }}" class="btn btn-secondary">
-                                <i class="fas fa-exchange-alt me-2"></i>Reassignments
-                            </a>
-                        </div>
-                    </div>
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card bg-gradient-primary text-white">
+                <div class="stat-number text-dark">{{ total_leads }}</div>
+                <div class="stat-label">Total Leads</div>
+                <div class="mt-2 text-dark">
+                    <small><i class="fas fa-users me-1     "></i>All leads in system</small>
                 </div>
             </div>
+        </div>
 
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Recent Activity</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="list-group">
-                            <a href="{{ url_for('admin.dashboard') }}" class="list-group-item list-group-item-action">
-                                <small class="text-muted">Just now</small><br>
-                                <span>You logged in to the system</span>
-                            </a>
-                            <a href="{{ url_for('admin.leads_management') }}" class="list-group-item list-group-item-action">
-                                <small class="text-muted">Today</small><br>
-                                <span>{{ total_leads }} leads in system</span>
-                            </a>
-                            <a href="{{ url_for('admin.agents_management') }}" class="list-group-item list-group-item-action">
-                                <small class="text-muted">Today</small><br>
-                                <span>{{ total_agents }} active agents</span>
-                            </a>
-                            <a href="{{ url_for('admin.feedbacks_history') }}" class="list-group-item list-group-item-action">
-                                <small class="text-muted">Today</small><br>
-                                <span>{{ total_feedbacks }} feedbacks submitted</span>
-                            </a>
-                            <a href="{{ url_for('admin.reassignments_history') }}" class="list-group-item list-group-item-action">
-                                <small class="text-muted">Today</small><br>
-                                <span>{{ total_reassignments }} lead reassignments</span>
-                            </a>
-                        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card border border-success">
+                <div class="stat-number text-success">{{ total_agents }}</div>
+                <div class="stat-label">Active Agents</div>
+                <div class="mt-2">
+                    <small class="text-muted"><i class="fas fa-user-tie me-1"></i>Currently working agents</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card border border-warning">
+                <div class="stat-number text-warning">{{ new_leads }}</div>
+                <div class="stat-label">New Leads</div>
+                <div class="mt-2">
+                    <small class="text-muted"><i class="fas fa-plus-circle me-1"></i>Recently uploaded</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="stat-card bg-gradient-warning text-white">
+                <div class="stat-number text-dark">{{ total_feedbacks }}</div>
+                <div class="stat-label">Total Feedbacks</div>
+                <div class="mt-2">
+                    <small><i class="fas fa-comment me-1 text-dark"></i>From agents and leads</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Recent Activity -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history text-primary me-2"></i>Recent Activity
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('admin.dashboard') }}" class="list-group-item list-group-item-action">
+                            <small class="text-muted">Just now</small><br>
+                            <span>You logged in to the system</span>
+                        </a>
+                        <a href="{{ url_for('admin.leads_management') }}" class="list-group-item list-group-item-action">
+                            <small class="text-muted">Today</small><br>
+                            <span>{{ total_leads }} leads in system</span>
+                        </a>
+                        <a href="{{ url_for('admin.agents_management') }}" class="list-group-item list-group-item-action">
+                            <small class="text-muted">Today</small><br>
+                            <span>{{ total_agents }} active agents</span>
+                        </a>
+                        <a href="{{ url_for('admin.feedbacks_history') }}" class="list-group-item list-group-item-action">
+                            <small class="text-muted">Today</small><br>
+                            <span>{{ total_feedbacks }} feedbacks submitted</span>
+                        </a>
+                        <a href="{{ url_for('admin.reassignments_history') }}" class="list-group-item list-group-item-action">
+                            <small class="text-muted">Today</small><br>
+                            <span>{{ total_reassignments }} lead reassignments</span>
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Quick Actions & Summary -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt text-warning me-2"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin.leads_management') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-users me-2"></i>Manage Leads
+                        </a>
+                        <a href="{{ url_for('admin.agents_management') }}" class="btn btn-outline-success">
+                            <i class="fas fa-user-tie me-2"></i>Manage Agents
+                        </a>
+                        <a href="{{ url_for('admin.upload_leads_page') }}" class="btn btn-outline-info">
+                            <i class="fas fa-plus me-2"></i>Upload New Leads
+                        </a>
+                        <a href="{{ url_for('admin.feedbacks_history') }}" class="btn btn-outline-warning text-dark">
+                            <i class="fas fa-comments me-2"></i>View Feedbacks
+                        </a>
+                        <a href="{{ url_for('admin.reassignments_history') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-exchange-alt me-2"></i>Reassignments
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Summary -->
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line text-success me-2"></i>System Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-success mb-1">{{ total_leads }}</div>
+                            <small class="text-muted">Total Leads</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-success mb-1">{{ total_agents }}</div>
+                            <small class="text-muted">Active Agents</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h4 text-warning mb-1">{{ new_leads }}</div>
+                            <small class="text-muted">New Leads</small>
+                        </div>
+             
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
 {% endblock %}

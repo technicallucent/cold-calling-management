@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Call Logs - Call Center System{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Call Logs</h1>
+            <p class="text-muted mb-0">Complete history of all your calls and interactions.</p>
+        </div>
+        <div class="text-end">
+            <a href="{{ url_for('agent.call_center') }}" class="btn btn-primary">
+                <i class="fas fa-phone me-2"></i>Back to Calling
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 bg-primary text-white">
+                <div class="card-body text-center py-3">
+                    <h4 class="mb-1">{{ call_logs|length }}</h4>
+                    <small>Total Calls</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-success text-white">
+                <div class="card-body text-center py-3">
+                    <h4 class="mb-1">{{ call_logs|selectattr('status', 'equalto', CallStatus.COMPLETED)|list|length }}</h4>
+                    <small>Completed</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-warning text-white">
+                <div class="card-body text-center py-3">
+                    <h4 class="mb-1">{{ call_logs|selectattr('status', 'equalto', CallStatus.CALLBACK_SCHEDULED)|list|length }}</h4>
+                    <small>Callbacks</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-info text-white">
+                <div class="card-body text-center py-3">
+                    <h4 class="mb-1">{{ call_logs|selectattr('status', 'in', ['busy', 'not_answered'])|list|length }}</h4>
+                    <small>Missed</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="completed">Completed</option>
+                        <option value="callback_scheduled">Callback Scheduled</option>
+                        <option value="busy">Busy</option>
+                        <option value="not_answered">Not Answered</option>
+                        <option value="wrong_number">Wrong Number</option>
+                        <option value="initiated">Initiated</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date Range</label>
+                    <input type="date" class="form-control" id="dateFilter">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Lead Name</label>
+                    <input type="text" class="form-control" id="nameFilter" placeholder="Search lead...">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-outline-secondary w-100" id="resetFilters">
+                        <i class="fas fa-refresh me-2"></i>Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Logs Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 py-3">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-history text-primary me-2"></i>Call History
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if call_logs %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="callLogsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Lead Details</th>
+                            <th>Call Time</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                            <th>Outcome</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for call in call_logs %}
+                        <tr data-status="{{ call.status.value }}" data-date="{{ call.call_time.strftime('%Y-%m-%d') }}" data-name="{{ call.lead.name.lower() }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-light rounded-circle d-flex align-items-center justify-content-center me-3">
+                                        <i class="fas fa-user text-muted"></i>
+                                    </div>
+                                    <div>
+                                        <strong>{{ call.lead.name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ call.lead.mobile }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ call.lead.project_name }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <strong>{{ call.call_time.strftime('%b %d, %Y') }}</strong>
+                                <br>
+                                <small class="text-muted">{{ call.call_time.strftime('%I:%M %p') }}</small>
+                            </td>
+                            <td>
+                                {% if call.duration_seconds %}
+                                    <span class="fw-bold text-dark">
+                                        {{ (call.duration_seconds // 60) }}:{{ "%02d" % (call.duration_seconds % 60) }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">--:--</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if call.status.value == 'completed' %}bg-success
+                                    {% elif call.status.value == 'callback_scheduled' %}bg-warning
+                                    {% elif call.status.value == 'busy' %}bg-info
+                                    {% elif call.status.value == 'not_answered' %}bg-secondary
+                                    {% elif call.status.value == 'wrong_number' %}bg-danger
+                                    {% else %}bg-primary{% endif %}">
+                                    {{ call.status.value|replace('_', ' ')|title }}
+                                </span>
+                            </td>
+                            <td>
+                                <small>
+                                    {% if call.outcome %}
+                                        {{ call.outcome|replace('_', ' ')|title }}
+                                    {% else %}
+                                        <span class="text-muted">No outcome</span>
+                                    {% endif %}
+                                </small>
+                            </td>
+                            <td>
+                                {% if call.call_notes %}
+                                    <small class="text-muted" data-bs-toggle="tooltip" title="{{ call.call_notes }}">
+                                        {{ call.call_notes[:50] }}{% if call.call_notes|length > 50 %}...{% endif %}
+                                    </small>
+                                {% else %}
+                                    <span class="text-muted">No notes</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#callDetailsModal{{ call.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <a href="{{ url_for('agent.call_lead', lead_id=call.lead.id) }}" class="btn btn-outline-success">
+                                        <i class="fas fa-phone"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Call Details Modal -->
+                        <div class="modal fade" id="callDetailsModal{{ call.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Call Details</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Lead Information</h6>
+                                                <p><strong>Name:</strong> {{ call.lead.name }}</p>
+                                                <p><strong>Mobile:</strong> {{ call.lead.mobile }}</p>
+                                                <p><strong>Email:</strong> {{ call.lead.email or 'N/A' }}</p>
+                                                <p><strong>Project:</strong> {{ call.lead.project_name }}</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Call Information</h6>
+                                                <p><strong>Call Time:</strong> {{ call.call_time.strftime('%Y-%m-%d %I:%M %p') }}</p>
+                                                <p><strong>Duration:</strong> 
+                                                    {% if call.duration_seconds %}
+                                                        {{ (call.duration_seconds // 60) }} minutes {{ call.duration_seconds % 60 }} seconds
+                                                    {% else %}
+                                                        Not recorded
+                                                    {% endif %}
+                                                </p>
+                                                <p><strong>Status:</strong> 
+                                                    <span class="badge bg-success">{{ call.status.value|replace('_', ' ')|title }}</span>
+                                                </p>
+                                                {% if call.follow_up_required and call.follow_up_date %}
+                                                <p><strong>Follow-up:</strong> {{ call.follow_up_date.strftime('%Y-%m-%d %I:%M %p') }}</p>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% if call.call_notes %}
+                                        <div class="row mt-3">
+                                            <div class="col-12">
+                                                <h6>Call Notes</h6>
+                                                <div class="border rounded p-3 bg-light">
+                                                    {{ call.call_notes }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        <a href="{{ url_for('agent.call_lead', lead_id=call.lead.id) }}" class="btn btn-primary">
+                                            <i class="fas fa-phone me-2"></i>Call Again
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-phone-slash fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Call Logs Found</h5>
+                <p class="text-muted">You haven't made any calls yet. Start calling to see your activity here.</p>
+                <a href="{{ url_for('agent.call_center') }}" class="btn btn-primary">
+                    <i class="fas fa-phone me-2"></i>Start Calling
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusFilter = document.getElementById('statusFilter');
+        const dateFilter = document.getElementById('dateFilter');
+        const nameFilter = document.getElementById('nameFilter');
+        const resetFilters = document.getElementById('resetFilters');
+        const tableRows = document.querySelectorAll('#callLogsTable tbody tr');
+
+        function filterTable() {
+            const statusValue = statusFilter.value;
+            const dateValue = dateFilter.value;
+            const nameValue = nameFilter.value.toLowerCase();
+
+            tableRows.forEach(row => {
+                const rowStatus = row.getAttribute('data-status');
+                const rowDate = row.getAttribute('data-date');
+                const rowName = row.getAttribute('data-name');
+
+                const statusMatch = !statusValue || rowStatus === statusValue;
+                const dateMatch = !dateValue || rowDate === dateValue;
+                const nameMatch = !nameValue || rowName.includes(nameValue);
+
+                if (statusMatch && dateMatch && nameMatch) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        statusFilter.addEventListener('change', filterTable);
+        dateFilter.addEventListener('change', filterTable);
+        nameFilter.addEventListener('input', filterTable);
+
+        resetFilters.addEventListener('click', function() {
+            statusFilter.value = '';
+            dateFilter.value = '';
+            nameFilter.value = '';
+            filterTable();
+        });
+
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}
