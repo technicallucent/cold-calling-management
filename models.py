@@ -28,6 +28,20 @@ class FeedbackType(enum.Enum):
     INTERESTED = 'interested'
     NOT_INTERESTED = 'not_interested'
     CALLBACK = 'callback'
+    CHANNEL_PARTNER = 'channel_partner'  # NEW
+    INTERESTED_OTHER = 'interested_other'  # NEW
+class Project(db.Model):
+    __tablename__ = "project"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False, unique=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Project {self.name}>"
+
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -59,11 +73,13 @@ class Lead(db.Model):
     source = db.Column(db.String(100), nullable=True, default='N/A')
     year = db.Column(db.Integer, nullable=True)
     location = db.Column(db.String(100), nullable=True, default='N/A')
-    
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    project = db.relationship('Project', backref='leads')
+
     # Assignment fields
     assigned_agent_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     assigned_date = db.Column(db.DateTime, nullable=True)
-    status = db.Column(db.String(50), default='new')  # new, assigned, interested, not_interested, callback, completed, reassigned
+    status = db.Column(db.String(50), default='new')  # new, assigned, interested, not_interested, callback, completed, reassigned, channel_partner, interested_other  # UPDATED
     
     # Additional lead fields
     alternate_phone = db.Column(db.String(15), nullable=True)
@@ -97,6 +113,7 @@ class LeadFeedback(db.Model):
     # Feedback type
     feedback_type = db.Column(db.Enum(FeedbackType), nullable=True)
     call_activity_id = db.Column(db.String(100), nullable=True)
+    
     # Feedback fields for interested customers
     project_interested = db.Column(db.String(200), nullable=True)
     location_preferred = db.Column(db.String(200), nullable=True)
@@ -104,6 +121,10 @@ class LeadFeedback(db.Model):
     budget_comfortable = db.Column(db.String(100), nullable=True)
     possession_timeline = db.Column(db.String(200), nullable=True)
     interest_level = db.Column(db.Enum(InterestLevel), nullable=True)
+    
+    # NEW FIELDS for all project-related feedback types
+    current_location = db.Column(db.String(200), nullable=True)  # NEW
+    status = db.Column(db.String(50), nullable=True)  # NEW: hot, warm, cold
     
     # Fields for not interested customers
     not_interested_reason = db.Column(db.String(200), nullable=True)
@@ -138,6 +159,8 @@ class LeadFeedback(db.Model):
             'budget_comfortable': self.budget_comfortable,
             'possession_timeline': self.possession_timeline,
             'interest_level': self.interest_level.value if self.interest_level else None,
+            'current_location': self.current_location,  # NEW
+            'status': self.status,  # NEW
             'not_interested_reason': self.not_interested_reason,
             'callback_time': self.callback_time.isoformat() if self.callback_time else None,
             'callback_notes': self.callback_notes,
@@ -162,7 +185,7 @@ class CallLog(db.Model):
     follow_up_date = db.Column(db.DateTime, nullable=True)
     
     # Call outcome details
-    outcome = db.Column(db.String(100), nullable=True)  # interested, not_interested, callback, etc.
+    outcome = db.Column(db.String(100), nullable=True)  # interested, not_interested, callback, channel_partner, interested_other, abusive  # UPDATED
     satisfaction_score = db.Column(db.Integer, nullable=True)  # 1-5 scale
     
     # Technical details
@@ -223,18 +246,21 @@ class LeadAssignmentHistory(db.Model):
     assigned_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
     note = db.Column(db.Text, nullable=True)
-    
-    # Additional assignment details
-    assignment_type = db.Column(db.String(50), default='manual')  # manual, auto, reassignment
+
+    assignment_type = db.Column(db.String(50), default='manual')
     previous_agent_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    
-    # Timestamps
+
+    # NEW FIELDS
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    previous_project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Relationships
-    agent = db.relationship('User', foreign_keys=[agent_id], backref='lead_assignments')
-    assigned_by = db.relationship('User', foreign_keys=[assigned_by_id], backref='assigned_leads_history')
-    previous_agent = db.relationship('User', foreign_keys=[previous_agent_id], backref='previous_assignments')
+    agent = db.relationship('User', foreign_keys=[agent_id])
+    assigned_by = db.relationship('User', foreign_keys=[assigned_by_id])
+    previous_agent = db.relationship('User', foreign_keys=[previous_agent_id])
+    project = db.relationship('Project', foreign_keys=[project_id])
+    previous_project = db.relationship('Project', foreign_keys=[previous_project_id])
 
 class SystemSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -275,7 +301,6 @@ class CallActivityLog(db.Model):
     # Relationships
     agent = db.relationship('User', backref=db.backref('call_activity_logs', lazy=True))
     lead = db.relationship('Lead', backref=db.backref('call_activity_logs', lazy=True))
-
 
     def to_dict(self):
         return {

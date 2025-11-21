@@ -4,7 +4,14 @@
 <div class="row">
     <div class="col-12">
         <h2>My Assigned Leads</h2>
-        
+
+        <!-- Start Calling Button -->
+        <div class="mb-3">
+            <a href="{{ url_for('agent.call_center') }}" class="btn btn-primary">
+                <i class="fas fa-phone me-2"></i>Start Calling
+            </a>
+        </div>
+
         <!-- Leads List -->
         <div class="card">
             <div class="card-header">
@@ -24,7 +31,6 @@
                                 <th>Location</th>
                                 <th>Status</th>
                                 <th>Assigned Date</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -33,7 +39,7 @@
                                 <td>{{ lead.id }}</td>
                                 <td>{{ lead.name }}</td>
                                 <td>{{ lead.mobile }}</td>
-                                <td>{{ lead.email or 'N/A' }}</td>
+                                <td>{{ lead.email or "N/A" }}</td>
                                 <td>{{ lead.project_name }}</td>
                                 <td>{{ lead.location }}</td>
                                 <td>
@@ -41,140 +47,7 @@
                                         {{ lead.status }}
                                     </span>
                                 </td>
-                                <td>{{ lead.assigned_date.strftime('%Y-%m-%d') if lead.assigned_date else 'N/A' }}</td>
-                                <td>
-                                    <div class="btn-group">
-                                        <!-- Add Feedback Button -->
-                                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" 
-                                                data-bs-target="#feedbackModal{{ lead.id }}">
-                                            <i class="fas fa-comment"></i>
-                                        </button>
-                                        
-                                        <!-- Reassign Button -->
-                                        <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" 
-                                                data-bs-target="#reassignModal{{ lead.id }}">
-                                            <i class="fas fa-share"></i>
-                                        </button>
-                                        
-                                        <!-- View History Button -->
-                                        <a href="{{ url_for('agent.feedback_history', lead_id=lead.id) }}" 
-                                           class="btn btn-sm btn-info">
-                                            <i class="fas fa-history"></i>
-                                        </a>
-                                    </div>
-
-                                    <!-- Feedback Modal -->
-                                    <div class="modal fade" id="feedbackModal{{ lead.id }}" tabindex="-1">
-                                        <div class="modal-dialog modal-lg">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">Add Feedback for {{ lead.name }}</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <form method="POST" action="{{ url_for('agent.add_feedback', lead_id=lead.id) }}" 
-                                                      enctype="multipart/form-data">
-                                                    <div class="modal-body">
-                                                        <div class="row">
-                                                            <div class="col-md-6">
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Project Interested</label>
-                                                                    <input type="text" class="form-control" name="project_interested" 
-                                                                           placeholder="Enter project name or interest details">
-                                                                </div>
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Location Preferred</label>
-                                                                    <input type="text" class="form-control" name="location_preferred" 
-                                                                           placeholder="Preferred location">
-                                                                </div>
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Configuration Interested</label>
-                                                                    <input type="text" class="form-control" name="configuration_interested" 
-                                                                           placeholder="Specify configuration">
-                                                                </div>
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Budget Comfortable</label>
-                                                                    <input type="text" class="form-control" name="budget_comfortable" 
-                                                                           placeholder="Enter budget details">
-                                                                </div>
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Interest Level</label>
-                                                                    <select class="form-select" name="interest_level" required>
-                                                                        <option value="">Select Level</option>
-                                                                        <option value="high">High</option>
-                                                                        <option value="medium">Medium</option>
-                                                                        <option value="low">Low</option>
-                                                                        <option value="not_interested">Not Interested</option>
-                                                                    </select>
-                                                                </div>
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Possession Timeline</label>
-                                                                    <input type="text" class="form-control" name="possession_timeline" 
-                                                                           placeholder="e.g., 3-6 months">
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="row">
-                                                            <div class="col-12">
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Additional Notes</label>
-                                                                    <textarea class="form-control" name="additional_notes" 
-                                                                              rows="3" placeholder="Enter call notes..."></textarea>
-                                                                </div>
-                                                                <div class="mb-3">
-                                                                    <label class="form-label">Call Recording (Optional)</label>
-                                                                    <input type="file" class="form-control" name="recording" 
-                                                                           accept=".wav,.mp3">
-                                                                    <div class="form-text">Supported formats: WAV, MP3 (max 16MB)</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                                        <button type="submit" class="btn btn-primary">Submit Feedback</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Reassign Modal -->
-                                    <div class="modal fade" id="reassignModal{{ lead.id }}" tabindex="-1">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">Reassign Lead: {{ lead.name }}</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <form method="POST" action="{{ url_for('agent.reassign_lead') }}">
-                                                    <div class="modal-body">
-                                                        <input type="hidden" name="lead_id" value="{{ lead.id }}">
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Select Agent</label>
-                                                            <select class="form-select" name="to_agent_id" required>
-                                                                <option value="">Select Agent</option>
-                                                                {% for agent in other_agents %}
-                                                                <option value="{{ agent.id }}">{{ agent.username }}</option>
-                                                                {% endfor %}
-                                                            </select>
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Reason for Reassignment</label>
-                                                            <textarea class="form-control" name="reason" rows="3" 
-                                                                      placeholder="Why are you reassigning this lead?" required></textarea>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-warning">Reassign Lead</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
+                                <td>{{ lead.assigned_date.strftime("%Y-%m-%d") if lead.assigned_date else "N/A" }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

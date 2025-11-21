@@ -3,8 +3,7 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
-      
-        
+
         <!-- Add Agent Form -->
         <div class="card mb-4">
             <div class="card-header">
@@ -57,38 +56,40 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for agent in agents %}
-                            <tr>
-                                <td>{{ agent.id }}</td>
-                                <td>{{ agent.username }}</td>
-                                <td>{{ agent.email }}</td>
-                                <td>
-                                    <span class="badge bg-{{ 'success' if agent.is_active else 'secondary' }}">
-                                        {{ 'Active' if agent.is_active else 'Inactive' }}
-                                    </span>
-                                </td>
-                                <td>{{ agent.created_at.strftime('%Y-%m-%d') }}</td>
-                                <td>
-                                    <span class="badge bg-info">{{ agent.assigned_leads|length }}</span>
-                                </td>
-                                <td>
-                                    {% if agent.is_active %}
-                                    <form method="POST" action="{{ url_for('admin.deactivate_agent', agent_id=agent.id) }}" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-warning">Deactivate</button>
-                                    </form>
-                                    {% else %}
-                                    <form method="POST" action="{{ url_for('admin.activate_agent', agent_id=agent.id) }}" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-success">Activate</button>
-                                    </form>
-                                    {% endif %}
-                                </td>
-                            </tr>
+
+                            {% for item in agent_stats %}
+                                {% set agent = item.agent %}
+                                <tr>
+                                    <td>{{ agent.id }}</td>
+                                    <td>{{ agent.username }}</td>
+                                    <td>{{ agent.email }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if agent.is_active else 'secondary' }}">
+                                            {{ 'Active' if agent.is_active else 'Inactive' }}
+                                        </span>
+                                    </td>
+                                    <td>{{ agent.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td><span class="badge bg-info">{{ item.assigned_leads }}</span></td>
+                                    <td>
+                                        {% if agent.is_active %}
+                                            <form method="POST" action="{{ url_for('admin.deactivate_agent', agent_id=agent.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-warning">Deactivate</button>
+                                            </form>
+                                        {% else %}
+                                            <form method="POST" action="{{ url_for('admin.activate_agent', agent_id=agent.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-success">Activate</button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
                             {% endfor %}
+
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 {% endblock %}

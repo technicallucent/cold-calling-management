@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, LeadAssignmentHistory, CallLog, CallStatus, FeedbackType, InterestLevel
+from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, LeadAssignmentHistory, CallLog, CallStatus, FeedbackType, InterestLevel,Project
 import pandas as pd
 import os
 from datetime import datetime, timedelta
@@ -259,14 +259,14 @@ def leads_management():
     new_leads = Lead.query.filter_by(status='new').count()
     assigned_leads = Lead.query.filter_by(status='assigned').count()
     completed_leads = Lead.query.filter_by(status='completed').count()
-    
+    projects = Project.query.all()
     return render_template('admin/leads_management.html', 
                          leads=leads, 
                          agents=agents,
                          total_leads=total_leads,
                          new_leads=new_leads,
                          assigned_leads=assigned_leads,
-                         completed_leads=completed_leads)
+                         completed_leads=completed_leads,    projects=projects)
 
 @admin_bp.route('/assign_lead', methods=['POST'])
 @login_required
@@ -276,48 +276,55 @@ def assign_lead():
     
     lead_id = request.form.get('lead_id')
     agent_id = request.form.get('agent_id')
+    project_id = request.form.get('project_id')
     assignment_note = request.form.get('assignment_note', 'Manual assignment by admin')
-    
+
     lead = Lead.query.get(lead_id)
     agent = User.query.get(agent_id)
-    
-    if not lead or not agent:
-        flash('Lead or agent not found', 'error')
+    project = Project.query.get(project_id)
+
+    if not lead or not agent or not project:
+        flash('Lead, agent, or project not found', 'error')
         return redirect(url_for('admin.leads_management'))
 
-    # Track reassignment if lead already assigned
+    # track reassignment
     if lead.assigned_agent_id and lead.assigned_agent_id != agent.id:
         reassignment = LeadReassignment(
             lead_id=lead.id,
             from_agent_id=lead.assigned_agent_id,
             to_agent_id=agent.id,
-            reason=f'Reassignment: {assignment_note}'
+            reason=f'Reassigned | {assignment_note}'
         )
         db.session.add(reassignment)
 
-    # Assign the lead
+    # assign
     previous_agent_id = lead.assigned_agent_id
+    previous_project_id = lead.project_id
+
     lead.assigned_agent_id = agent.id
     lead.assigned_date = datetime.utcnow()
     lead.status = 'assigned'
+    lead.project_id = project.id
 
-    # Record assignment history
+    # history
     history = LeadAssignmentHistory(
         lead_id=lead.id,
         agent_id=agent.id,
         assigned_by_id=current_user.id,
         previous_agent_id=previous_agent_id,
+        previous_project_id=previous_project_id,
+        project_id=project.id,
         note=assignment_note
     )
     db.session.add(history)
 
     try:
         db.session.commit()
-        flash(f'Lead assigned to {agent.username} successfully!', 'success')
-    except Exception as e:
+        flash(f'Lead assigned to {agent.username} for project {project.name}', 'success')
+    except:
         db.session.rollback()
-        flash('Error assigning lead. Please try again.', 'error')
-    
+        flash('Error assigning lead', 'error')
+
     return redirect(url_for('admin.leads_management'))
 
 @admin_bp.route('/bulk_assign', methods=['POST'])
@@ -328,55 +335,64 @@ def bulk_assign():
 
     lead_ids = request.form.getlist('lead_ids')
     agent_id = request.form.get('agent_id')
+    project_id = request.form.get('project_id')
     assignment_note = request.form.get('bulk_assignment_note', 'Bulk assignment by admin')
 
-    if not lead_ids or not agent_id:
-        flash('Select at least one lead and an agent.', 'error')
+    if not lead_ids or not agent_id or not project_id:
+        flash('Select leads, agent, and project.', 'error')
         return redirect(url_for('admin.leads_management'))
 
     agent = User.query.get(agent_id)
-    if not agent:
-        flash('Agent not found.', 'error')
+    project = Project.query.get(project_id)
+
+    if not agent or not project:
+        flash('Agent or project not found.', 'error')
         return redirect(url_for('admin.leads_management'))
 
     leads = Lead.query.filter(Lead.id.in_(lead_ids)).all()
     assigned_count = 0
-    
+
     for lead in leads:
-        # Track reassignment if already assigned
+
+        # track reassignment
         if lead.assigned_agent_id and lead.assigned_agent_id != agent.id:
             reassignment = LeadReassignment(
                 lead_id=lead.id,
                 from_agent_id=lead.assigned_agent_id,
                 to_agent_id=agent.id,
-                reason=f'Bulk reassignment: {assignment_note}'
+                reason=f'Bulk reassignment | {assignment_note}'
             )
             db.session.add(reassignment)
 
-        # Assign lead
         previous_agent_id = lead.assigned_agent_id
+        previous_project_id = lead.project_id
+
         lead.assigned_agent_id = agent.id
         lead.assigned_date = datetime.utcnow()
-        lead.status = 'assigned'
+        lead.status = "assigned"
+        lead.project_id = project.id
 
-        # Record assignment history
+        # history
         history = LeadAssignmentHistory(
             lead_id=lead.id,
             agent_id=agent.id,
             assigned_by_id=current_user.id,
             previous_agent_id=previous_agent_id,
+            previous_project_id=previous_project_id,
+            project_id=project.id,
             note=assignment_note
         )
         db.session.add(history)
+
         assigned_count += 1
 
     try:
         db.session.commit()
-        flash(f'{assigned_count} leads assigned to {agent.username} successfully!', 'success')
+        flash(f'{assigned_count} leads assigned to {agent.username} for project {project.name}', 'success')
     except Exception as e:
         db.session.rollback()
-        flash('Error assigning leads. Please try again.', 'error')
-    
+        flash('Error assigning leads.', 'error')
+
     return redirect(url_for('admin.leads_management'))
 
 @admin_bp.route('/delete_lead/<int:lead_id>', methods=['POST'])
@@ -433,22 +449,22 @@ def agents_management():
     if not admin_required():
         return redirect(url_for('agent.dashboard'))
     
+    # Get all agents
     agents = User.query.filter_by(role=UserRole.AGENT).order_by(User.created_at.desc()).all()
-    
-    # Get agent statistics
+
+    # Build agent statistics
     agent_stats = []
+    today = datetime.utcnow().date()
+
     for agent in agents:
         assigned_leads = Lead.query.filter_by(assigned_agent_id=agent.id).count()
         completed_leads = Lead.query.filter_by(assigned_agent_id=agent.id, status='completed').count()
         total_feedbacks = LeadFeedback.query.filter_by(agent_id=agent.id).count()
-        
-        # Today's calls
-        today = datetime.utcnow().date()
         today_calls = CallLog.query.filter(
             CallLog.agent_id == agent.id,
             func.date(CallLog.call_time) == today
         ).count()
-        
+
         agent_stats.append({
             'agent': agent,
             'assigned_leads': assigned_leads,
@@ -456,8 +472,11 @@ def agents_management():
             'total_feedbacks': total_feedbacks,
             'today_calls': today_calls
         })
-    
-    return render_template('admin/agents.html', agent_stats=agent_stats)
+
+    return render_template(
+        'admin/agents.html',
+        agent_stats=agent_stats
+    )
 
 @admin_bp.route('/add_agent', methods=['POST'])
 @login_required

@@ -1,11 +1,12 @@
+
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, InterestLevel, CallLog, CallStatus, FeedbackType,CallActivityLog
+from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, InterestLevel, CallLog, CallStatus, FeedbackType, CallActivityLog
 import os
 from datetime import datetime, timedelta
 import json
-
+import requests
 agent_bp = Blueprint('agent', __name__)
 
 def allowed_file(filename, allowed_extensions):
@@ -230,10 +231,11 @@ def handle_call_action(lead_id):
             # Map action to CallStatus
             action_mapping = {
                 'interested': CallStatus.COMPLETED,
+                'channel_partner': CallStatus.COMPLETED,
+                'interested_other': CallStatus.COMPLETED,
                 'not_interested': CallStatus.COMPLETED,
-                'busy': CallStatus.BUSY,
+                'abusive': CallStatus.COMPLETED,
                 'not_answered': CallStatus.NOT_ANSWERED,
-                'wrong_number': CallStatus.WRONG_NUMBER,
                 'callback': CallStatus.CALLBACK_SCHEDULED
             }
             
@@ -249,10 +251,11 @@ def handle_call_action(lead_id):
     # Map actions to lead status and form types
     action_mapping = {
         'interested': ('interested', 'interested'),
+        'channel_partner': ('channel_partner', 'channel_partner'),
+        'interested_other': ('interested_other', 'interested_other'),
         'not_interested': ('not_interested', 'not_interested'),
-        'busy': ('callback', 'callback'),
+        'abusive': ('not_interested', 'not_interested'),
         'not_answered': ('callback', 'callback'),
-        'wrong_number': ('not_interested', 'not_interested'),
         'callback': ('callback', 'callback')
     }
     
@@ -261,15 +264,17 @@ def handle_call_action(lead_id):
         lead.status = lead_status
         lead.updated_at = datetime.utcnow()
         
-        # Only show form for specific actions
-        if action in ['interested', 'not_interested', 'callback']:
+        # Show form for all actions except not_answered
+        if action in ['interested', 'channel_partner', 'interested_other', 'not_interested', 'callback']:
             response_data['show_form'] = True
             response_data['form_type'] = form_type
         else:
             response_data['show_form'] = False
         
-        # For wrong number, pre-fill the reason
-        if action == 'wrong_number':
+        # For abusive and wrong number, pre-fill the reason
+        if action == 'abusive':
+            response_data['preset_reason'] = 'Abusive / Fake'
+        elif action == 'wrong_number':
             response_data['preset_reason'] = 'Wrong Number'
     
     db.session.commit()
@@ -303,6 +308,7 @@ def submit_feedback(lead_id):
     # Get form data
     feedback_type = request.form.get('feedback_type')
     currentCallActivityId = request.form.get('call_log_id')
+    
     # Create feedback based on type
     feedback = LeadFeedback(
         lead_id=lead_id,
@@ -320,11 +326,23 @@ def submit_feedback(lead_id):
         feedback.location_preferred = request.form.get('location_preferred')
         feedback.configuration_interested = request.form.get('configuration_interested')
         feedback.budget_comfortable = request.form.get('budget_comfortable')
-        interest_level = request.form.get('interest_level')
-        if interest_level:
-            feedback.interest_level = InterestLevel(interest_level)
+        feedback.current_location = request.form.get('current_location')
+        feedback.status = request.form.get('status')  # hot/warm/cold
         feedback.possession_timeline = request.form.get('possession_timeline')
         lead.status = 'completed'
+        
+    elif feedback_type == 'channel_partner':
+      
+        lead.status = 'channel_partner'
+        
+    elif feedback_type == 'interested_other':
+        feedback.project_interested = request.form.get('project_interested')
+        feedback.location_preferred = request.form.get('location_preferred')
+        feedback.configuration_interested = request.form.get('configuration_interested')
+        feedback.budget_comfortable = request.form.get('budget_comfortable')
+        feedback.current_location = request.form.get('current_location')
+        feedback.possession_timeline = request.form.get('possession_timeline')
+        lead.status = 'interested_other'
         
     elif feedback_type == 'not_interested':
         feedback.not_interested_reason = request.form.get('not_interested_reason')
@@ -497,7 +515,6 @@ def feedback_history(lead_id):
         call_activity_data=call_activity_data
     )
 
-
 @agent_bp.route('/all_feedback')
 @login_required
 def all_feedback():
@@ -550,24 +567,25 @@ def get_next_lead(current_lead_id):
         })
     else:
         return jsonify({'next_lead_id': None, 'message': 'No more leads'})
+
 @agent_bp.route('/add_frontend_log', methods=['POST'])
 @login_required
 def add_frontend_log():
     data = request.get_json()
     lead_id = data.get('lead_id')
     agent_id = data.get('agent_id')
-    call_log_id = data.get('call_log_id')  # ✅ New
+    call_log_id = data.get('call_log_id')
     message = data.get('message')
     log_type = data.get('type', 'info')
     timestamp = data.get('timestamp')
-    print(call_log_id)
+    
     if not lead_id or not agent_id:
         return jsonify(success=False, message="Missing lead_id or agent_id"), 400
 
     new_log = CallActivityLog(
         agent_id=agent_id,
         lead_id=lead_id,
-        call_log_id=call_log_id,  # ✅ Link to specific call log
+        call_log_id=call_log_id,
         message=message,
         type=log_type
     )
@@ -578,3 +596,68 @@ def add_frontend_log():
     print(f"[{timestamp}] Lead {lead_id} | Agent {agent_id} | {log_type.upper()} - {message}")
 
     return jsonify(success=True, log=new_log.to_dict())
+
+
+
+@agent_bp.route('/send_to_crm_proxy', methods=['POST'])
+@login_required
+def send_to_crm_proxy():
+    """
+    Proxy route to send lead data to external CRM webhook.
+    Safe logging and JSON responses.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify(success=False, message="No JSON received"), 400
+
+        # Validate required fields
+        required_fields = ["name", "email", "mobile", "project"]
+        missing = [f for f in required_fields if not data.get(f)]
+        if missing:
+            return jsonify(success=False, message=f"Missing fields: {', '.join(missing)}"), 400
+
+        # Prepare CRM payload
+        webhook_data = {
+            "country_code": "91",
+            "mobile": data["mobile"],
+            "form_name": "Lead Inquiry",
+            "name": data["name"],
+            "email": data["email"],
+            "project_name": data["project"]
+        }
+
+        # Send to CRM
+        resp = requests.post(
+            "https://valueproperties.tranquilcrmone.in/wordpresswebhook",
+            data=webhook_data,
+            timeout=25
+        )
+
+        # Optional: log the CRM send safely
+        try:
+            lead_id = data.get("lead_id")
+            agent_id = data.get("agent_id", current_user.id)
+            if lead_id:
+                message = f"Sent lead to CRM: {data['name']} | {data['mobile']}"
+                new_log = CallActivityLog(
+                    agent_id=agent_id,
+                    lead_id=lead_id,
+                    message=message,
+                    type="crm"
+                )
+                db.session.add(new_log)
+                db.session.commit()
+        except Exception as e:
+            # Logging failed, but do not block CRM send
+            print(f"[CRM Logging Error] Could not log CRM send: {e}")
+
+        # Return response to frontend
+        if resp.ok:
+            return jsonify(success=True, message="Lead sent to CRM successfully"), 200
+        else:
+            return jsonify(success=False, message=f"CRM Error: {resp.text}"), 500
+
+    except Exception as e:
+        # Catch-all error handling
+        return jsonify(success=False, message=f"Exception: {str(e)}"), 500
