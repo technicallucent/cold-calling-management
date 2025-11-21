@@ -6,3 +6,4 @@ SQLAlchemy
 Werkzeug
 gunicorn
 openpyxl
+requests
