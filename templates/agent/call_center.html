@@ -79,7 +79,7 @@
             </div>
         </div>
 
-        <div class="row g-4">
+        <div class="row g-4 flex-column-reverse flex-lg-row">
             <!-- Left Sidebar - Customer Profile -->
             <div class="col-lg-4">
                 <!-- Customer Profile Card -->
@@ -91,12 +91,12 @@
                         <h4 class="profile-name">{{ current_lead.name }}</h4>
                         <span class="profile-id">ID: #{{ current_lead.id }}</span>
                     </div>
-                           <!-- Send to CRM Button -->
-                <div class="mt-3">
-                    <button id="sendbtn" class="btn btn-primary w-100 m-1" onclick="sendToCRM()">
-                        <i class="fas fa-paper-plane"></i> Send to CRM
-                    </button>
-                </div>
+                    <!-- Send to CRM Button -->
+                    <div class="mt-3">
+                        <button id="sendbtn" class="btn btn-primary w-100 m-1" onclick="sendToCRM()">
+                            <i class="fas fa-paper-plane"></i> Send to CRM
+                        </button>
+                    </div>
 
                     <div class="profile-details">
                         <div class="detail-row">
@@ -182,7 +182,7 @@
                         </button>
                     </div>
                 </div>
-         
+
 
                 <!-- Missing Data Modal -->
                 <div class="modal fade" id="missingDataModal" tabindex="-1">
@@ -199,18 +199,20 @@
                                 </div>
                                 <div class="mb-2">
                                     <label>Email</label>
-                                    <input  type="email"   id="popup_email" class="form-control" />
+                                    <input type="email" id="popup_email" class="form-control" />
                                 </div>
                                 <div class="mb-2">
                                     <label>Mobile</label>
                                     <input id="popup_mobile" class="form-control" />
                                 </div>
-                    <div class="mb-2">
-    <label>Project Name</label>
-    <select id="popup_project" class="form-control">
-        <!-- Project options will be populated dynamically -->
-    </select>
-</div>
+                                <div class="mb-2">
+                                    <label>Project Name</label>
+                                    <select id="popup_project" class="form-control">
+                                   {% for project in projects %}
+            <option value="{{ project.project_id }}">{{ project.name }}</option>
+        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -220,113 +222,118 @@
                     </div>
                 </div>
 
-            <script>
-function sendToCRM() {
-    // Collect lead data from template
-        const projects = ["micl", "lodha", "aero estate"];
-        
-    // Populate the select
-    const projectSelect = document.getElementById("popup_project");
-    projectSelect.innerHTML = ""; // clear previous options
-    projects.forEach(project => {
-        let option = document.createElement("option");
-        option.value = project;
-        option.text = project;
-        projectSelect.appendChild(option);
-    });
+                <script>
+                      const projectSelect = document.getElementById("popup_project");
 
-    // Prefill with current lead project, skip "None"
-    let currentProject = "{{ current_lead.project.name }}";
-    if (!currentProject || currentProject.toLowerCase() === "none") currentProject = "";
-    projectSelect.value = currentProject;
-    let lead = {
-        name: "{{ current_lead.name }}",
-        email: "{{ current_lead.email }}",
-        mobile: "{{ current_lead.mobile }}",
-        project: "{{ current_lead.project.name }}",
-        lead_id: "{{ current_lead.id }}",
-        agent_id: "{{ current_user.id }}"
-    };
+    // Use project_id from server-side variable
+    const leadProjectId = "{{ current_lead.project.project_id  }}";
 
-    // Prefill modal inputs, treating "None" or empty as blank
-    document.getElementById("popup_name").value = lead.name && lead.name.toLowerCase() !== "none" ? lead.name : "";
-    document.getElementById("popup_email").value = lead.email && lead.email.toLowerCase() !== "none" ? lead.email : "";
-    document.getElementById("popup_mobile").value = lead.mobile && lead.mobile.toLowerCase() !== "none" ? lead.mobile : "";
-    document.getElementById("popup_project").value = lead.project && lead.project.toLowerCase() !== "none" ? lead.project : "";
-
-    // Clear previous validation states
-    ["popup_name", "popup_email", "popup_mobile", "popup_project"].forEach(id => {
-        document.getElementById(id).classList.remove("is-invalid");
-    });
-
-    // Show modal
-    let modal = new bootstrap.Modal(document.getElementById("missingDataModal"));
-    modal.show();
-}
-
-function submitMissingData() {
-    let lead = {
-        name: document.getElementById("popup_name").value.trim(),
-        email: document.getElementById("popup_email").value.trim(),
-        mobile: document.getElementById("popup_mobile").value.trim(),
-        project: document.getElementById("popup_project").value.trim(),
-        lead_id: "{{ current_lead.id }}",
-        agent_id: "{{ current_user.id }}"
-    };
-
-    // Clear previous validation states
-    ["popup_name", "popup_email", "popup_mobile", "popup_project"].forEach(id => {
-        document.getElementById(id).classList.remove("is-invalid");
-    });
-
-    // Validate fields and mark missing
-    let missingFields = [];
-    for (let key of ["name", "email", "mobile", "project"]) {
-        if (!lead[key] || lead[key].toLowerCase() === "none") {
-            missingFields.push(key);
-            document.getElementById("popup_" + key).classList.add("is-invalid");
-        }
+    if (leadProjectId) {
+        projectSelect.value = leadProjectId; // select the option
+        console.log("Selected project_id:", leadProjectId);
+    } else {
+        projectSelect.selectedIndex = 0; // default to first option
     }
+                    function sendToCRM() {
+                        // Collect lead data from template
+                    
 
-    if (missingFields.length > 0) {
-        // Optionally, you can focus the first missing field
-        document.getElementById("popup_" + missingFields[0]).focus();
-        return; // Don't send to CRM
-    }
+                        // Populate the select
+                        const projectSelect = document.getElementById("popup_project");
+               
 
-    // Hide modal
-    bootstrap.Modal.getInstance(document.getElementById("missingDataModal")).hide();
+                        // Prefill with current lead project, skip "None"
+                        let currentProject = "{{ current_lead.project.name }}";
+                        if (!currentProject || currentProject.toLowerCase() === "none") currentProject = "";
+                        projectSelect.value = currentProject;
+                        let lead = {
+                            name: "{{ current_lead.name }}",
+                            email: "{{ current_lead.email }}",
+                            mobile: "{{ current_lead.mobile }}",
+                            project: "{{ current_lead.project.project_id }}",
+                            lead_id: "{{ current_lead.id }}",
+                            agent_id: "{{ current_user.id }}"
+                        };
 
-    // Send to CRM
-    sendLeadToCRM(lead);
-}
+                        // Prefill modal inputs, treating "None" or empty as blank
+                        document.getElementById("popup_name").value = lead.name && lead.name.toLowerCase() !== "none" ? lead.name : "";
+                        document.getElementById("popup_email").value = lead.email && lead.email.toLowerCase() !== "none" ? lead.email : "";
+                        document.getElementById("popup_mobile").value = lead.mobile && lead.mobile.toLowerCase() !== "none" ? lead.mobile : "";
+                        document.getElementById("popup_project").value = lead.project && lead.project.toLowerCase() !== "none" ? lead.project : "";
 
-function sendLeadToCRM(lead) {
-    fetch("/agent/send_to_crm_proxy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(lead)
-    })
-    .then(async r => {
-        let text = await r.text();
-        try {
-            let res = JSON.parse(text);
-            if (res.success) {
-                alert(res.message);
-            } else {
-                alert("Error: " + res.message);
-            }
-        } catch (e) {
-            alert("Server returned invalid JSON: " + text);
-        }
-    })
-    .catch(err => alert("Network error: " + err));
-}
-</script>
+                        // Clear previous validation states
+                        ["popup_name", "popup_email", "popup_mobile", "popup_project"].forEach(id => {
+                            document.getElementById(id).classList.remove("is-invalid");
+                        });
+
+                        // Show modal
+                        let modal = new bootstrap.Modal(document.getElementById("missingDataModal"));
+                        modal.show();
+                    }
+
+                    function submitMissingData() {
+                        let lead = {
+                            name: document.getElementById("popup_name").value.trim(),
+                            email: document.getElementById("popup_email").value.trim(),
+                            mobile: document.getElementById("popup_mobile").value.trim(),
+                            project: document.getElementById("popup_project").value.trim(),
+                            lead_id: "{{ current_lead.id }}",
+                            agent_id: "{{ current_user.id }}"
+                        };
+
+                        // Clear previous validation states
+                        ["popup_name", "popup_email", "popup_mobile", "popup_project"].forEach(id => {
+                            document.getElementById(id).classList.remove("is-invalid");
+                        });
+
+                        // Validate fields and mark missing
+                        let missingFields = [];
+                        for (let key of ["name", "email", "mobile", "project"]) {
+                            if (!lead[key] || lead[key].toLowerCase() === "none") {
+                                missingFields.push(key);
+                                document.getElementById("popup_" + key).classList.add("is-invalid");
+                            }
+                        }
+
+                        if (missingFields.length > 0) {
+                            // Optionally, you can focus the first missing field
+                            document.getElementById("popup_" + missingFields[0]).focus();
+                            return; // Don't send to CRM
+                        }
+
+                        // Hide modal
+                        bootstrap.Modal.getInstance(document.getElementById("missingDataModal")).hide();
+
+                        // Send to CRM
+                        sendLeadToCRM(lead);
+                    }
+
+                    function sendLeadToCRM(lead) {
+                        fetch("/agent/send_to_crm_proxy", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(lead)
+                        })
+                            .then(async r => {
+                                let text = await r.text();
+                                try {
+                                    let res = JSON.parse(text);
+                                    if (res.success) {
+                                        alert(res.message);
+                                    } else {
+                                        alert("Error: " + res.message);
+                                    }
+                                } catch (e) {
+                                    alert("Server returned invalid JSON: " + text);
+                                }
+                            })
+                            .catch(err => alert("Network error: " + err));
+                    }
+                </script>
 
 
                 <!-- Today's Progress Card -->
-                <div class="stats-card">
+                <div class="stats-card d-none">
                     <h5 class="stats-title">
                         <i class="fas fa-chart-line"></i>
                         Today's Progress
@@ -374,9 +381,16 @@ function sendLeadToCRM(lead) {
                         </div>
 
                         <div class="call-action-main">
+
                             <button class="btn-call-start" id="startCallBtn">
-                                <i class="fas fa-phone"></i>
-                                <span>Start Call</span>
+                                <div class="desktop-btn"> <i class="fas fa-phone"></i>
+                                    <span>Start Call</span>
+                                </div>
+                                <div class="mobile-btn">
+                                    <a href="tel:{{ current_lead.mobile }}"><i class="fas fa-phone"></i>
+                                        <span>Start Call</span></a>
+                                </div>
+
                             </button>
                             <button class="btn-call-end" id="endCallBtn" style="display: none;">
                                 <i class="fas fa-phone-slash"></i>
@@ -411,7 +425,7 @@ function sendLeadToCRM(lead) {
                             </button>
                             <button class="outcome-btn outcome-not-answered" data-action="not_answered">
                                 <i class="fas fa-phone-slash"></i>
-                                <span>Not Answered / Declined</span>
+                                <span>Ringing / Declined</span>
                             </button>
                             <button class="outcome-btn outcome-callback" data-action="callback">
                                 <i class="fas fa-redo"></i>
@@ -644,7 +658,7 @@ function sendLeadToCRM(lead) {
                 'interested_other': 'Interested in other project',
                 'not_interested': 'Customer not interested',
                 'abusive': 'Abusive / Fake call',
-                'not_answered': 'Call not answered / declined',
+                'not_answered': 'Call  Ringing / Declined',
                 'callback': 'Callback scheduled'
             };
 
@@ -715,7 +729,7 @@ function sendLeadToCRM(lead) {
 
             // Send log data to backend
             const currentLeadId = {{ current_lead.id }};
-            const currentAgentId = {{ current_user.id }};
+        const currentAgentId = {{ current_user.id }};
 
         fetch('{{ url_for("agent.add_frontend_log") }}', {
             method: 'POST',
@@ -746,9 +760,33 @@ function sendLeadToCRM(lead) {
             return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
         }
 
-        function loadFeedbackForm(formType, presetReason = null) {
+        async function loadFeedbackForm(formType, presetReason = null) {
             const formContainer = document.getElementById('feedbackFormContent');
             const feedbackTab = document.getElementById('feedbackTab');
+            const [projectsRes, locationsRes] = await Promise.all([
+                fetch('/agent/api/projects'),
+                fetch('/agent/api/locations')
+            ]);
+
+            // Convert responses to JSON (if your API returns JSON)
+            const [projects, locations] = await Promise.all([
+                projectsRes.json(),
+                locationsRes.json()
+            ]);
+
+            console.log('Projects:', projects);
+            console.log('Locations:', locations);
+            // Generate project options
+            let projectOptions = `<option value="">Select Project</option>`;
+            projects.forEach(p => {
+                projectOptions += `<option value="${p.id}">${p.name}</option>`;
+            });
+
+            // Generate location options
+            let locationOptions = `<option value="">Select Preferred Location</option>`;
+            locations.forEach(l => {
+                locationOptions += `<option value="${l.id}">${l.name}</option>`;
+            });
 
             let formHtml = '';
 
@@ -780,14 +818,9 @@ function sendLeadToCRM(lead) {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Preferred Location *</label>
-                                <select class="form-select location-select" name="location_preferred" required>
-                                    <option value="">Select Preferred Location</option>
-                                    <option value="North">North</option>
-                                    <option value="South">South</option>
-                                    <option value="East">East</option>
-                                    <option value="West">West</option>
-                                    <option value="Central">Central</option>
-                                </select>
+                                                       <select class="form-select location-select" name="location_preferred" required>
+                            ${locationOptions}
+                        </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Current Location</label>
@@ -796,13 +829,9 @@ function sendLeadToCRM(lead) {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Preferred Project *</label>
-                                <select class="form-select project-select" name="project_interested" required>
-                                    <option value="">Select Project</option>
-                                    <option value="Project A">Project A</option>
-                                    <option value="Project B">Project B</option>
-                                    <option value="Project C">Project C</option>
-                                    <option value="Project D">Project D</option>
-                                </select>
+                                  <select class="form-select project-select" name="project_interested" required>
+                            ${projectOptions}
+                        </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Possession Timeline</label>
@@ -889,12 +918,7 @@ function sendLeadToCRM(lead) {
                             <div class="col-md-6">
                                 <label class="form-label">Preferred Location</label>
                                 <select class="form-select location-select" name="location_preferred">
-                                    <option value="">Select Preferred Location</option>
-                                    <option value="North">North</option>
-                                    <option value="South">South</option>
-                                    <option value="East">East</option>
-                                    <option value="West">West</option>
-                                    <option value="Central">Central</option>
+                                                ${locationOptions}
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -905,11 +929,7 @@ function sendLeadToCRM(lead) {
                             <div class="col-md-6">
                                 <label class="form-label">Preferred Project</label>
                                 <select class="form-select project-select" name="project_interested">
-                                    <option value="">Select Project</option>
-                                    <option value="Project A">Project A</option>
-                                    <option value="Project B">Project B</option>
-                                    <option value="Project C">Project C</option>
-                                    <option value="Project D">Project D</option>
+                                                     ${projectOptions}
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -1026,9 +1046,7 @@ function sendLeadToCRM(lead) {
                             </div>
                         </div>
                         <div class="d-flex justify-content-end gap-2 mt-4">
-                            <button type="button" class="btn btn-secondary" onclick="document.querySelector('[data-tab=\\'feedback\\']').click()">
-                                Cancel
-                            </button>
+                                <button type="button" class="btn btn-secondary cancel-feedback-btn">Cancel</button>
                             <button type="submit" class="btn btn-warning">
                                 <i class="fas fa-clock me-2"></i>Schedule Callback
                             </button>
@@ -1038,6 +1056,26 @@ function sendLeadToCRM(lead) {
             }
 
             formContainer.innerHTML = formHtml;
+                   // Bind Cancel button
+
+document.getElementById('feedbackFormContent').addEventListener('click', (e) => {
+    if (e.target.matches('button.btn-secondary')) { // all cancel buttons
+        console.log("Cancel clicked");
+
+        // Hide the feedback form
+        const feedbackTab = document.getElementById('feedbackTab');
+        if (feedbackTab) feedbackTab.classList.remove('active');
+
+        // Show main tab (replace 'feedback' with your main tab name if different)
+        const mainTabBtn = document.querySelector('[data-tab="feedback"]'); 
+        if (mainTabBtn) mainTabBtn.classList.add('active');
+
+        // Optional: clear the form content
+        const formContainer = document.getElementById('feedbackFormContent');
+        if (formContainer) formContainer.innerHTML = '';
+    }
+});
+
 
             // Initialize Select2 for all dropdowns
             $('.status-select, .budget-select, .location-select, .project-select, .possession-select, .configuration-select, .reason-select').select2({
@@ -1068,7 +1106,9 @@ function sendLeadToCRM(lead) {
             document.querySelectorAll('.outcome-btn').forEach(btn => {
                 btn.disabled = true;
             });
+            
         });
+ 
     </script>
 </body>
 

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Locations</title>
+</head>
+<body>
+
+<h1>All Locations</h1>
+
+<a href="{{ url_for('admin.create_location') }}">Create New Location</a>
+
+<table border="1" cellpadding="8">
+    <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Created At</th>
+        <th>Actions</th>
+    </tr>
+
+    {% for loc in locations %}
+    <tr>
+        <td>{{ loc.id }}</td>
+        <td>{{ loc.name }}</td>
+        <td>{{ loc.created_at }}</td>
+        <td>
+            <form action="{{ url_for('admin.delete_location', id=loc.id) }}" method="POST">
+                <button onclick="return confirm('Delete this location?');">Delete</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, LeadAssignmentHistory, CallLog, CallStatus, FeedbackType, InterestLevel,Project
+from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, LeadAssignmentHistory, CallLog, CallStatus, FeedbackType, InterestLevel,Project,Location,CallActivityLog
 import pandas as pd
 import os
 from datetime import datetime, timedelta
@@ -646,10 +646,40 @@ def lead_details(lead_id):
     lead = Lead.query.get_or_404(lead_id)
     
     # Get comprehensive lead history
-    feedbacks = LeadFeedback.query.filter_by(lead_id=lead.id).order_by(LeadFeedback.created_at.desc()).all()
+    
     reassignments = LeadReassignment.query.filter_by(lead_id=lead.id).order_by(LeadReassignment.reassigned_at.desc()).all()
-    call_logs = CallLog.query.filter_by(lead_id=lead.id).order_by(CallLog.call_time.desc()).all()
+    
     assignment_history = LeadAssignmentHistory.query.filter_by(lead_id=lead.id).order_by(LeadAssignmentHistory.assigned_at.desc()).all()
+    feedbacks = LeadFeedback.query.filter_by(lead_id=lead_id).all()
+    call_logs = CallActivityLog.query.filter_by(lead_id=lead_id).order_by(CallActivityLog.created_at.desc()).all()
+
+    # Group by call_log_id (include all call sessions even if no feedback)
+    grouped = {}
+
+    for log in call_logs:
+        grouped.setdefault(log.call_log_id, {
+            'call_log_id': log.call_log_id,
+            'call_logs': [],
+            'feedbacks': [],
+            'latest_time': log.created_at
+        })
+        grouped[log.call_log_id]['call_logs'].append(log)
+        if log.created_at > grouped[log.call_log_id]['latest_time']:
+            grouped[log.call_log_id]['latest_time'] = log.created_at
+
+    for fb in feedbacks:
+        if fb.call_activity_id:
+            grouped.setdefault(fb.call_activity_id, {
+                'call_log_id': fb.call_activity_id,
+                'call_logs': [],
+                'feedbacks': [],
+                'latest_time': fb.created_at
+            })
+            grouped[fb.call_activity_id]['feedbacks'].append(fb)
+            if fb.created_at > grouped[fb.call_activity_id]['latest_time']:
+                grouped[fb.call_activity_id]['latest_time'] = fb.created_at
+
+    call_activity_data = sorted(grouped.values(), key=lambda x: x['latest_time'], reverse=True)
     
     return render_template(
         'admin/lead_details.html',
@@ -657,7 +687,8 @@ def lead_details(lead_id):
         feedbacks=feedbacks,
         reassignments=reassignments,
         call_logs=call_logs,
-        assignment_history=assignment_history
+        assignment_history=assignment_history,
+        call_activity_data=call_activity_data
     )
 
 @admin_bp.route('/reassignments')
@@ -799,3 +830,92 @@ def api_agent_performance():
         })
     
     return jsonify(result)
+# ---------------------------
+# Show all projects
+# ---------------------------
+@admin_bp.route("/projects")
+def list_projects():
+    projects = Project.query.order_by(Project.created_at.desc()).all()
+    return render_template("admin/projects_list.html", projects=projects)
+
+
+# ---------------------------
+# Create project (GET + POST)
+# ---------------------------
+
+
+@admin_bp.route("/projects/create", methods=["GET", "POST"])
+def create_project():
+    if request.method == "POST":
+        project_id = request.form.get("project_id")
+        name = request.form.get("name")
+
+        new_project = Project(project_id=project_id, name=name)
+
+        try:
+            db.session.add(new_project)
+            db.session.commit()
+            flash("Project created successfully!", "success")
+            return redirect(url_for("admin.list_projects"))
+
+        except IntegrityError:
+            db.session.rollback()
+            flash("Project name or Project ID already exists!", "error")
+            return redirect(url_for("admin.create_project"))
+
+    return render_template("admin/project_create.html")
+
+# ---------------------------
+# Delete project
+# ---------------------------
+@admin_bp.route("/projects/delete/<int:id>", methods=["POST"])
+def delete_project(id):
+    project = Project.query.get_or_404(id)
+    db.session.delete(project)
+    db.session.commit()
+    flash("Project deleted!", "success")
+    return redirect(url_for("admin.list_projects"))
+@admin_bp.route("/locations")
+def list_locations():
+    locations = Location.query.order_by(Location.created_at.desc()).all()
+    return render_template("admin/locations_list.html", locations=locations)
+
+
+# -----------------------------
+# Create location
+# -----------------------------
+@admin_bp.route("/locations/create", methods=["GET", "POST"])
+def create_location():
+    if request.method == "POST":
+        name = request.form.get("name")
+
+        if not name:
+            flash("Location name is required!", "error")
+            return redirect(url_for("admin.create_location"))
+
+        new_location = Location(name=name)
+
+        try:
+            db.session.add(new_location)
+            db.session.commit()
+            flash("Location created successfully!", "success")
+            return redirect(url_for("admin.list_locations"))
+
+        except IntegrityError:
+            db.session.rollback()
+            flash("Location name already exists!", "error")
+            return redirect(url_for("admin.create_location"))
+
+    return render_template("admin/location_create.html")
+
+
+# -----------------------------
+# Delete location
+# -----------------------------
+@admin_bp.route("/locations/delete/<int:id>", methods=["POST"])
+def delete_location(id):
+    loc = Location.query.get_or_404(id)
+    db.session.delete(loc)
+    db.session.commit()
+    flash("Location deleted!", "success")
+    return redirect(url_for("admin.list_locations"))

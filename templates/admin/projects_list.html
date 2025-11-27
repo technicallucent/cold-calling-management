@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Projects</title>
+</head>
+<body>
+    <h1>Projects</h1>
+
+    <a href="{{ url_for('admin.create_project') }}">Create New Project</a>
+
+    <table border="1" cellpadding="8">
+        <tr>
+            <th>ID</th>
+            <th>Project ID</th>
+            <th>Name</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+
+        {% for p in projects %}
+        <tr>
+            <td>{{ p.id }}</td>
+            <td>{{ p.project_id }}</td>
+            <td>{{ p.name }}</td>
+            <td>{{ p.created_at }}</td>
+            <td>
+                <form action="{{ url_for('admin.delete_project', id=p.id) }}" method="POST" style="display:inline;">
+                    <button type="submit" onclick="return confirm('Delete project?');">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</body>
+</html>

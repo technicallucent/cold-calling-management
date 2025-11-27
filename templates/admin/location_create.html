@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Location</title>
+</head>
+<body>
+
+<h1>Create New Location</h1>
+
+<form method="POST">
+    <label>Name:</label><br>
+    <input type="text" name="name" required><br><br>
+
+    <button type="submit">Create</button>
+</form>
+
+<br>
+<a href="{{ url_for('admin.list_locations') }}">Back to Locations</a>
+
+</body>
+</html>

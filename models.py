@@ -34,13 +34,20 @@ class Project(db.Model):
     __tablename__ = "project"
 
     id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.String(100), nullable=False, unique=True)
+
     name = db.Column(db.String(200), nullable=False, unique=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
 
     def __repr__(self):
         return f"<Project {self.name}>"
+
 
 
 class User(UserMixin, db.Model):
@@ -312,3 +319,16 @@ class CallActivityLog(db.Model):
             'type': self.type,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+class Location(db.Model):
+    __tablename__ = "location"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+     
+    name = db.Column(db.String(200), nullable=False, unique=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Location {self.name}>"

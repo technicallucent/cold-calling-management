@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, InterestLevel, CallLog, CallStatus, FeedbackType, CallActivityLog
+from models import db, User, UserRole, Lead, LeadFeedback, LeadReassignment, InterestLevel, CallLog, CallStatus, FeedbackType, CallActivityLog,Project, Location
 import os
 from datetime import datetime, timedelta
 import json
@@ -74,8 +74,11 @@ def call_center():
     current_lead = leads[0]
     lead_index = 0
     total_leads = len(leads)
-    
+    # Assuming current_lead.project.name gives the project name
+    current_lead_project = Project.query.filter_by(name=current_lead.project.name).first()
+
     # Get stats for dashboard
+    projects = Project.query.all()
     assigned_leads = Lead.query.filter_by(assigned_agent_id=current_user.id).count()
     completed_leads = Lead.query.filter_by(assigned_agent_id=current_user.id, status='completed').count()
     pending_leads = Lead.query.filter_by(assigned_agent_id=current_user.id, status='assigned').count()
@@ -101,7 +104,7 @@ def call_center():
                          completed_leads=completed_leads,
                          pending_leads=pending_leads,
                          today_calls=today_calls,
-                         other_agents=other_agents)
+                         other_agents=other_agents,projects=projects,current_lead_project=current_lead_project)
 
 @agent_bp.route('/call_lead/<int:lead_id>')
 @login_required
@@ -661,3 +664,14 @@ def send_to_crm_proxy():
     except Exception as e:
         # Catch-all error handling
         return jsonify(success=False, message=f"Exception: {str(e)}"), 500
+@agent_bp.route('/api/projects')
+def get_projects():
+    projects = Project.query.order_by(Project.name).all()
+    data = [{"id": p.project_id, "name": p.name} for p in projects]
+    return jsonify(data)
+
+@agent_bp.route('/api/locations')
+def get_locations():
+    locations = Location.query.order_by(Location.name).all()
+    data = [{"id": l.id, "name": l.name} for l in locations]
+    return jsonify(data)

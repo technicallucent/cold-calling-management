@@ -687,13 +687,24 @@ body {
     font-weight: 500;
     margin: 0.25rem 0;
 }
-
+.mobile-btn{
+    display: none;
+}
+.mobile-btn,a{
+    color: white;
+    text-decoration: none;
+}
 /* Responsive */
 @media (max-width: 768px) {
     .nav-controls {
         flex-wrap: wrap;
     }
-
+    .mobile-btn{
+    display: block;
+}
+.desktop-btn{
+    display: none;
+}
     .nav-btn span {
         display: none;
     }
@@ -719,5 +730,9 @@ body {
         width: 100%;
         transform: none;
         margin-top: 1rem;
+    }
+    
+    .outcome-btn,.btn-call-start,.call-timer-display{
+font-size: 12px;
     }
 }
