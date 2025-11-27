@@ -554,6 +554,7 @@ body {
     display: none;
     max-height: 80vh;
     overflow-y: auto;
+
 }
 
 .tab-content.active {
@@ -726,10 +727,15 @@ body {
     }
 
     .tab-content {
-        position: static;
+      position: fixed;
         width: 100%;
         transform: none;
         margin-top: 1rem;
+        top: 0px;
+        left: 0px;
+        height: 100vh;
+          max-height: 100vh;
+      
     }
     
     .outcome-btn,.btn-call-start,.call-timer-display{
